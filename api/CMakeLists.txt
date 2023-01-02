@@ -1,0 +1,1 @@
+install(TARGETS pwsafe PUBLIC_HEADER)
