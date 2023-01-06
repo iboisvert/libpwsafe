@@ -88,18 +88,71 @@ static void db_free(PwsDb *pdb)
     free(pdb);
 }
 
-static _Bool db_read_header(PwsDb *pdb)
+static _Bool db_read_header(FILE *f, Header *h)
 {
-    FILE *f = pdb->db_file;
-    Header *hdr = &pdb->db_header;
-    if (fread(hdr->random, 1, sizeof(hdr->random), f) != sizeof(hdr->random) ||
-        fread(hdr->hash, 1, sizeof(hdr->hash), f) != sizeof(hdr->hash) ||
-        fread(hdr->salt, 1, sizeof(hdr->salt), f) != sizeof(hdr->salt) ||
-        fread(hdr->iv, 1, sizeof(hdr->iv), f) != sizeof(hdr->iv))
+    if (fread(h->random, 1, sizeof(h->random), f) != sizeof(h->random) ||
+        fread(h->hash, 1, sizeof(h->hash), f) != sizeof(h->hash) ||
+        fread(h->salt, 1, sizeof(h->salt), f) != sizeof(h->salt) ||
+        fread(h->iv, 1, sizeof(h->iv), f) != sizeof(h->iv))
     {
         return false;
     }
     return true;
+}
+
+static _Bool db_check_password(Header *h, const char *pw)
+{
+    // generate test hash from random and passphrase
+    // I am mystified as to why Bruce uses these extra 2 zero bytes in the hashes
+    struct sha1_ctx sha_ctx;
+    sha1_init(&sha_ctx);
+    sha1_update(&sha_ctx, sizeof(h->random), h->random);
+    const static unsigned char zeros[2] = {0, 0};
+    sha1_update(&sha_ctx, sizeof(zeros), zeros);
+    size_t pw_len = strlen(pw);
+    sha1_update(&sha_ctx, pw_len, (const uint8_t *)pw);
+    unsigned char key[SHA1_DIGEST_SIZE];
+    sha1_digest(&sha_ctx, sizeof(key), key);
+
+    struct blowfish_ctx bf_ctx;
+    blowfish_set_key(&bf_ctx, sizeof(key), key);
+
+    Block block;
+    memcpy(&block, h->random, BLOCK_SIZE);
+
+    // For nettle to match OpenSSL we must swap byte order before and after encrypt
+    // TODO: test this on a big-endian machine
+    swap_byte_order(block);
+
+    // to mimic passwordsafe I use BF_encrypt() directly, but that means I have to pretend that I am on a little-endian
+    // machine b/c passwordsafe assumes a i386
+    for (int i = 0; i < 1000; ++i)
+        blowfish_encrypt(&bf_ctx, BLOCK_SIZE, (uint8_t *)&block, (const uint8_t *)&block);
+
+    swap_byte_order(block);
+
+    // Now comes a sad part: I have to hack to mimic the original passwordsafe which contains what I believe
+    // is a bug. passwordsafe used its own blowfish and sha1 libraries, and its version of SHA1Final()
+    // memset the sha context to 0's. However the passwordsafe code went ahead and performed a
+    // SHA1Update on that zero'ed context. This of course did not crash anything, but it is not
+    // a real sha hash b/c the initial state of a real sha1 is not all zeros. Also we end up only
+    // hashing 8 bytes of stuff, so there are not 20 bytes of randomness in the result.
+    // The good thing is we are hashing something which is already well hashed, so I doubt this
+    // opened up any holes. But it does show that one should always step the program in a debugger
+    // and watch what the variables are doing; sometimes it is eye opening!
+    sha1_init(&sha_ctx);
+    memset_func(sha_ctx.state, 0, sizeof(sha_ctx.state));
+    sha1_update(&sha_ctx, BLOCK_SIZE, (const uint8_t *)block);
+    sha1_update(&sha_ctx, sizeof(zeros), zeros);
+    unsigned char test_hash[SHA1_DIGEST_SIZE];
+    sha1_digest(&sha_ctx, sizeof(test_hash), test_hash);
+
+    memset_func(key, 0, sizeof(key));
+    memset_func(&bf_ctx, 0, sizeof(bf_ctx));
+
+    _Bool equal = memcmp(test_hash, h->hash, sizeof(h->hash)) == 0 ? true : false;
+
+    return equal;
 }
 
 static _Bool db_read_block(PwsDb *pdb, Block block, PWS_RESULT_CODE *rc)
@@ -286,16 +339,26 @@ PWSAFE_EXTERN PWSHANDLE pws_db_open(const char *pathname, const char *password, 
         return NULL;
     }
 
-    PwsDb *pdb = db_alloc();
-    pdb->db_file = dbfile;
+    Header header;
 
-    if (!db_read_header(pdb))
+    if (!db_read_header(dbfile, &header))
     {
         if (rc)
             *rc = PWS_ERR_OPEN;
-        db_free(pdb);
         return NULL;
     }
+
+    if (!db_check_password(&header, password))
+    {
+        if (rc)
+            *rc = PWS_ERR_INCORRECT_PW;
+        return NULL;
+    }
+
+    PwsDb *pdb = db_alloc();
+    pdb->db_file = dbfile;
+    memcpy(&pdb->db_header, &header, sizeof(pdb->db_header));
+
     db_compute_key(pdb, password);
 
     if (rc)
@@ -310,67 +373,6 @@ PWSAFE_EXTERN void pws_db_close(PWSHANDLE hdb, PWS_RESULT_CODE *rc)
     // Trash memory in case client tries to reuse invalid pointer
     PwsDb *pdb = (PwsDb *)hdb;
     db_free(pdb);
-}
-
-PWSAFE_EXTERN _Bool pws_db_check_password(PWSHANDLE hdb, const char *pw)
-{
-    if (!check_hdb(hdb, NULL))
-        return false;
-
-    PwsDb *pdb = (PwsDb *)hdb;
-    Header *h = &pdb->db_header;
-
-    // generate test hash from random and passphrase
-    // I am mystified as to why Bruce uses these extra 2 zero bytes in the hashes
-    struct sha1_ctx sha_ctx;
-    sha1_init(&sha_ctx);
-    sha1_update(&sha_ctx, sizeof(h->random), h->random);
-    const static unsigned char zeros[2] = {0, 0};
-    sha1_update(&sha_ctx, sizeof(zeros), zeros);
-    size_t pw_len = strlen(pw);
-    sha1_update(&sha_ctx, pw_len, (const uint8_t *)pw);
-    unsigned char key[SHA1_DIGEST_SIZE];
-    sha1_digest(&sha_ctx, sizeof(key), key);
-
-    struct blowfish_ctx bf_ctx;
-    blowfish_set_key(&bf_ctx, sizeof(key), key);
-
-    Block block;
-    memcpy(&block, h->random, BLOCK_SIZE);
-
-    // For nettle to match OpenSSL we must swap byte order before and after encrypt
-    // TODO: test this on a big-endian machine
-    swap_byte_order(block);
-
-    // to mimic passwordsafe I use BF_encrypt() directly, but that means I have to pretend that I am on a little-endian
-    // machine b/c passwordsafe assumes a i386
-    for (int i = 0; i < 1000; ++i)
-        blowfish_encrypt(&bf_ctx, BLOCK_SIZE, (uint8_t *)&block, (const uint8_t *)&block);
-
-    swap_byte_order(block);
-
-    // Now comes a sad part: I have to hack to mimic the original passwordsafe which contains what I believe
-    // is a bug. passwordsafe used its own blowfish and sha1 libraries, and its version of SHA1Final()
-    // memset the sha context to 0's. However the passwordsafe code went ahead and performed a
-    // SHA1Update on that zero'ed context. This of course did not crash anything, but it is not
-    // a real sha hash b/c the initial state of a real sha1 is not all zeros. Also we end up only
-    // hashing 8 bytes of stuff, so there are not 20 bytes of randomness in the result.
-    // The good thing is we are hashing something which is already well hashed, so I doubt this
-    // opened up any holes. But it does show that one should always step the program in a debugger
-    // and watch what the variables are doing; sometimes it is eye opening!
-    sha1_init(&sha_ctx);
-    memset_func(sha_ctx.state, 0, sizeof(sha_ctx.state));
-    sha1_update(&sha_ctx, BLOCK_SIZE, (const uint8_t *)block);
-    sha1_update(&sha_ctx, sizeof(zeros), zeros);
-    unsigned char test_hash[SHA1_DIGEST_SIZE];
-    sha1_digest(&sha_ctx, sizeof(test_hash), test_hash);
-
-    memset_func(key, 0, sizeof(key));
-    memset_func(&bf_ctx, 0, sizeof(bf_ctx));
-
-    _Bool equal = memcmp(test_hash, h->hash, sizeof(h->hash)) == 0 ? true : false;
-
-    return equal;
 }
 
 PWSAFE_EXTERN _Bool pws_db_read_accounts(PWSHANDLE hdb, PWS_RESULT_CODE *rc)
