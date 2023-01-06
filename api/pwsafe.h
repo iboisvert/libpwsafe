@@ -63,15 +63,6 @@ PWSAFE_EXTERN PWSHANDLE pws_db_open(const char *pathname, const char *password, 
 PWSAFE_EXTERN void pws_db_close(PWSHANDLE hdb, PWS_RESULT_CODE *rc);
 
 /**
- * Check if password is correct to unlock database.
- * \param[in] hdb Database handle
- * \param[in] password The database password
- * \returns `true` if password is correct, `false` otherwise.
- * \see pws_db_open()
-*/
-PWSAFE_EXTERN _Bool pws_db_check_password(PWSHANDLE hdb, const char *password);
-
-/**
  * Read all accounts from the database
  * \param[in] hdb Database handle
  * \param[out] rc Optional result code, > 0 if operation failed.
