@@ -17,6 +17,6 @@ target_link_libraries(
 add_dependencies(libpwsafe-test pwsafe)
 
 include(GoogleTest)
-gtest_discover_tests(libpwsafe-test)
+gtest_discover_tests(libpwsafe-test WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/../test")
 
 # add_test("unit tests" COMMAND libpwsafe-test)
