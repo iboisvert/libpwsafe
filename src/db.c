@@ -6,6 +6,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <pwd.h>
+#include <unistd.h>
+
+extern const char *trim_right(const char *pbegin, char *pend);
 
 // IMB 2023-01-01 Most of the code here is
 // adapted from code by Nicolas Dade https://github.com/nsd20463/pwsafe
@@ -26,6 +31,11 @@ static const unsigned char DB_MAGIC[16] = {
 
 const char * const PWSAFE_V2_NAME_MAGIC = 
     " !!!Version 2 File Format!!! Please upgrade to PasswordSafe 2.0 or later";
+
+typedef enum {
+    PWSAFE_DB_V1,
+    PWSAFE_DB_V2,
+} PWS_DB_VERSION;
 
 typedef uint8_t Block[8];
 static const size_t BLOCK_SIZE = sizeof(Block);
@@ -49,32 +59,84 @@ typedef struct
     Block cbc;
 } PwsDb;
 
-typedef struct
-{
-    uint8_t type;
-    char *value;
-} PwsDbField;
-
-typedef struct
-{
-    PwsDbField *fields;
-} PwsDbRecord;
-
 /** Swap block byte order le--be */
-static void swap_byte_order(Block b)
+static inline void swap_byte_order(Block b)
 {
     uint32_t *l = (uint32_t *)(b), *h = (uint32_t *)(b + 4);
     *l = __builtin_bswap32(*l);
     *h = __builtin_bswap32(*h);
 }
 
-static PwsDb *db_alloc()
+static const char *get_default_user()
+{
+    const char *dl = getenv("PWSAFE_DEFAULT_USER");
+    if (!dl)
+    {
+        dl = getenv("USER");
+        if (!dl)
+        {
+            dl = getenv("LOGNAME");
+            if (!dl)
+            {
+                // fine, we'll go get LOGNAME from the pwdatabase
+                const struct passwd *const pw = getpwuid(getuid());
+                if (pw)
+                {
+                    dl = pw->pw_name;
+                }
+            }
+        }
+    }
+    if (!dl)
+    {
+        // no USER, no LOGNAME, no /etc/passwd entry for this UID; they're on their own now
+        dl = "";
+    }
+    return dl;
+}
+
+static inline _Bool is_ws(const char c)
+{
+    return c == ' ' || c == '\n' || c == '\r' || c == '\t';
+}
+
+/** 
+ * Trim whitespace from right side of string 
+ * \param pend Pointer to character after end-of-string (usually `'0'`).
+ *             Length of string is `(pend-pbegin)`
+ * \note
+ * A null terminator will be assigned after the first non-whitespace character,
+ * or at `pbegin` if the string consists entirely of whitespace
+ */
+const char *trim_right(const char *pbegin, char *pend)
+{
+    assert(pend);
+    assert(pbegin);
+    assert(pend > pbegin);
+    while (pend-- > pbegin && is_ws(*pend)) ;
+    *(pend+1) = 0;
+    return pbegin;
+}
+
+static inline void set_rc(PWS_RESULT_CODE *prc, PWS_RESULT_CODE rc)
+{
+    if (prc) *prc = rc;
+}
+
+static PwsDb *db_alloc(PWS_RESULT_CODE *rc)
 {
     PwsDb *pdb = NULL;
     pdb = malloc(sizeof(PwsDb));
-    memcpy(pdb->magic, DB_MAGIC, sizeof(DB_MAGIC));
-    pdb->ver = 1;
-    pdb->db_file = NULL;
+    if (!pdb)
+    {
+        set_rc(rc, PWS_ERR_ALLOC);
+    }
+    else
+    {
+        memcpy(pdb->magic, DB_MAGIC, sizeof(DB_MAGIC));
+        pdb->ver = 1;
+        pdb->db_file = NULL;
+    }
     return pdb;
 }
 
@@ -86,6 +148,39 @@ static void db_free(PwsDb *pdb)
     }
     memset_func(pdb, 0, sizeof(*pdb));
     free(pdb);
+}
+
+static PwsDbField *alloc_field(uint8_t type, char *value)
+{
+    PwsDbField *p = malloc(sizeof(PwsDbField));
+    if (p)
+    {
+        p->type = type;
+        p->value = value;
+        p->next = NULL;
+    }
+    return p;
+}
+
+static void free_fields(PwsDbField *p)
+{
+    while (p != NULL)
+    {
+        PwsDbField *pnext = p->next;
+        size_t len = strlen(p->value);
+        memset_func(p->value, 0, len);
+        free(p->value);
+        memset_func(p, 0, sizeof(*p));
+        free(p);
+        p = pnext;
+    }
+}
+
+static void free_record(PwsDbRecord *p)
+{
+    free_fields(p->fields);
+    memset_func(p, 0, sizeof(*p));
+    free(p);
 }
 
 static _Bool db_read_header(FILE *f, Header *h)
@@ -155,9 +250,26 @@ static _Bool db_check_password(Header *h, const char *pw)
     return equal;
 }
 
+static const char *db_get_title(PwsDbRecord *record)
+{
+    assert(record);
+    PwsDbField *field = record->fields;
+    while (field != NULL && field->type != FT_TITLE)
+    {
+        field = field->next;
+    }
+    const char *retval = NULL;
+    if (field)
+    {
+        retval = field->value;
+    }
+    return retval;
+}
+
 static _Bool db_read_block(PwsDb *pdb, Block block, PWS_RESULT_CODE *rc)
 {
-    *rc = PWS_SUCCESS;
+    assert(pdb);
+    set_rc(rc, PWS_SUCCESS);
 
     FILE *f = pdb->db_file;
     size_t len = fread(block, 1, BLOCK_SIZE, f);
@@ -165,11 +277,11 @@ static _Bool db_read_block(PwsDb *pdb, Block block, PWS_RESULT_CODE *rc)
     {
         if (feof(f))
         {
-            *rc = PWS_ERR_CORRUPT_DB;
+            set_rc(rc, PWS_ERR_CORRUPT_DB);
         }
         else
         {
-            *rc = PWS_ERR_READ;
+            set_rc(rc, PWS_ERR_READ);
         }
         return false;
     }
@@ -177,8 +289,9 @@ static _Bool db_read_block(PwsDb *pdb, Block block, PWS_RESULT_CODE *rc)
     Block save_block;
     memcpy(save_block, block, BLOCK_SIZE);
 
-    // There is something very fishy about having to 
-    // swap byte-order in order to match OpenSSL
+    // I believe that the reason that byte-ordering is required
+    // is because the blowfish implementation used in the original passwordsafe
+    // operated on 32-bit ints and not arrays of bytes
     swap_byte_order(block);
     blowfish_decrypt(&pdb->bf_ctx, BLOCK_SIZE, (uint8_t *)block, (const uint8_t *)block);
     swap_byte_order(block);
@@ -195,86 +308,222 @@ static _Bool db_read_block(PwsDb *pdb, Block block, PWS_RESULT_CODE *rc)
     return true;
 }
 
-static _Bool db_read_next_field(PwsDb *pdb, uint8_t *type, char **str, PWS_RESULT_CODE *rc)
+static _Bool db_read_next_field(PwsDb *pdb, PwsDbField **field, PWS_RESULT_CODE *rc)
 {
-    *type = FT_END;
-    *str = NULL;
+    assert(field);
+    *field = NULL;
 
     Block block;
     if (!db_read_block(pdb, block, rc))
         return false;
 
-    *type = block[4];
+    uint8_t type;
+    char *str;
+
+    type = block[4];
     int32_t len = *(int32_t *)(block);
     if (len < 0 || len > 64 * 1024)
     {
-        *rc = PWS_ERR_CORRUPT_DB;
+        set_rc(rc, PWS_ERR_CORRUPT_DB);
         return false;
     }
 
-    char *s = *str = malloc(len + 1);
     size_t nblocks = (len + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    str = malloc(nblocks*BLOCK_SIZE + 1);
+    if (!str)
+    {
+        set_rc(rc, PWS_ERR_ALLOC);
+        return false;
+    }
 
     for (size_t i = 0; i < nblocks; ++i)
     {
         if (!db_read_block(pdb, block, rc))
         {
-            free(*str);
-            *str = NULL;
+            free(str);
             return false;
         }
-        memcpy(s + i * BLOCK_SIZE, block, BLOCK_SIZE);
+        memcpy(str + i * BLOCK_SIZE, block, BLOCK_SIZE);
     }
-    s[len] = 0;
+    str[len] = 0;
+
+    *field = alloc_field(type, str);
+    if (!*field)
+    {
+        set_rc(rc, PWS_ERR_ALLOC);
+        free(str);
+        return false;
+    }
 
     return true;
 }
 
-static _Bool db_read_next_v1_record(PwsDb *pdb, PWS_RESULT_CODE *rc)
+const static char SPLIT_CHAR = '\xAD';
+const static char DEFAULT_USER_CHAR = '\xA0';
+
+static _Bool db_read_next_v1_record(PwsDb *pdb, PwsDbField** fields, PWS_RESULT_CODE *rc)
 {
-    uint8_t unused;
-    char *value;
+    assert(fields);
+    PwsDbField *phead = NULL, *p = NULL;
 
-    _Bool status = db_read_next_field(pdb, &unused, &value, rc);
-    status = status && db_read_next_field(pdb, &unused, &value, rc);
-    status = status && db_read_next_field(pdb, &unused, &value, rc);
+    _Bool status = db_read_next_field(pdb, &p, rc);
+    if (status)
+    {
+        p->type = FT_NAME;
+        phead = p;
 
+        const char *name = p->value;
+        const char *pos = strchr(name, SPLIT_CHAR);
+        if (!pos) 
+        {
+            pos = strchr(name, DEFAULT_USER_CHAR);
+        }
+        if (!pos)
+        {
+            // no magic split chars; assume this is a very old database that contains no login field
+            pos = name + strlen(name);
+        }
+
+        p = alloc_field(FT_TITLE, NULL);
+        if (!p)
+        {
+            set_rc(rc, PWS_ERR_ALLOC);
+            status = false;
+            goto done;
+        }
+        size_t len = pos - name;
+        p->value = malloc(len+1);
+        if (!p->value)
+        {
+            set_rc(rc, PWS_ERR_ALLOC);
+            status = false;
+            goto done;
+        }
+        strncpy(p->value, name, len);
+        trim_right(p->value, p->value+len);
+        p->next = phead;
+        phead = p;
+
+        if (*pos == SPLIT_CHAR || *pos == DEFAULT_USER_CHAR)
+        {
+            p = alloc_field(FT_USER, NULL);
+            if (!p)
+            {
+                set_rc(rc, PWS_ERR_ALLOC);
+                status = false;
+                goto done;
+            }
+            if (*pos == SPLIT_CHAR)
+            {
+                // split name_login if it contains the magic split char
+                size_t len = strlen(pos+1);
+                p->value = malloc(len+1);
+                if (!p->value)
+                {
+                    set_rc(rc, PWS_ERR_ALLOC);
+                    status = false;
+                    goto done;
+                }
+                strncpy(p->value, pos+1, len);
+                trim_right(p->value, p->value+len);
+            }
+            else //if (*pos == DEFAULT_USER_CHAR)
+            {
+                // this entry uses the default login. this is not part of the database; 
+                // instead it is part of the configuration, or in our case, $USER
+                const char *default_user = get_default_user();
+                size_t len = strlen(default_user);
+                p->value = malloc(len+1);
+                if (!p->value)
+                {
+                    set_rc(rc, PWS_ERR_ALLOC);
+                    status = false;
+                    goto done;
+                }
+                strncpy(p->value, default_user, len);
+                trim_right(p->value, p->value+len);
+            }
+            p->next = phead;
+            phead = p;
+        }
+    }
+    status = status && db_read_next_field(pdb, &p, rc);
+    if (status)
+    {
+        p->type = FT_PASSWORD;
+        p->next = phead;
+        phead = p;
+    }
+    status = status && db_read_next_field(pdb, &p, rc);
+    if (status)
+    {
+        p->type = FT_NOTES;
+        p->next = phead;
+        phead = p;
+    }
+
+done:
+    *fields = phead;
     return status;
 }
 
-static _Bool db_read_next_v2_record(PwsDb *pdb, PWS_RESULT_CODE *rc)
+static _Bool db_read_next_v2_record(PwsDb *pdb, PwsDbField** fields, PWS_RESULT_CODE *rc)
 {
+    assert(fields);
+    set_rc(rc, PWS_SUCCESS);
+
     _Bool status = true;
     FILE *f = pdb->db_file;
+    PwsDbField *phead = NULL;
 
     int nfields = 1000;
-    while (status && !feof(f) && nfields-- > 1)
+    while (status && (status = !feof(f) && nfields-- > 1))
     {
-        uint8_t type;
-        char *value;
-        status = db_read_next_field(pdb, &type, &value, rc);
-        switch(type) {
-            case FT_END: goto done;
+        PwsDbField *pfield = NULL;
+        status = db_read_next_field(pdb, &pfield, rc);
+        if (status)
+        {
+            pfield->next = phead;
+            phead = pfield;
+            if (pfield->type == FT_END) goto done;
         }
     }
     if (nfields == 0)
     {
-        *rc = PWS_ERR_CORRUPT_DB;
+        // We've read too many fields for a single record, 
+        // something is not right
+        set_rc(rc, PWS_ERR_CORRUPT_DB);
     }
+
 done:
+    *fields = phead;
     return status;
 }
 
-static _Bool db_read_next_record(PwsDb *pdb, PWS_RESULT_CODE *rc)
+static _Bool db_read_next_record(PwsDb *pdb, PwsDbRecord** record, PWS_RESULT_CODE *rc)
 {
+    PwsDbField *fields = NULL;
+    _Bool status = false;
     if (pdb->db_vers == PWSAFE_DB_V2)
     {
-        return db_read_next_v2_record(pdb, rc);
+        status = db_read_next_v2_record(pdb, &fields, rc);
     }
     else
     {
-        return db_read_next_v1_record(pdb, rc);
+        status = db_read_next_v1_record(pdb, &fields, rc);
     }
+    if (status)
+    {
+        *record = malloc(sizeof(PwsDbRecord));
+        if (!*record)
+        {
+            set_rc(rc, PWS_ERR_ALLOC);
+            free_fields(fields);
+            return false;
+        }
+        (*record)->fields = fields;
+    }
+    return status;
 }
 
 static void db_compute_key(PwsDb *pdb, const char *pw)
@@ -297,14 +546,12 @@ static _Bool check_hdb(PWSHANDLE hdb, PWS_RESULT_CODE *rc)
     PwsDb *pdb = (PwsDb *)hdb;
     if (!pdb)
     {
-        if (rc)
-            *rc = PWS_ERR_INVALID_ARG;
+        set_rc(rc, PWS_ERR_INVALID_ARG);
         goto err;
     }
     if (memcmp(pdb->magic, DB_MAGIC, sizeof(DB_MAGIC)) != 0)
     {
-        if (rc)
-            *rc = PWS_ERR_INVALID_HANDLE;
+        set_rc(rc, PWS_ERR_INVALID_HANDLE);
         goto err;
     }
 
@@ -326,16 +573,24 @@ err:
 //     }
 // }
 
+PWSAFE_EXTERN void pws_free_db_records(PwsDbRecord *p)
+{
+    while (p != NULL)
+    {
+        PwsDbRecord *pnext = p->next;
+        free_record(p);
+        p = pnext;
+    }
+}
+
 PWSAFE_EXTERN PWSHANDLE pws_db_open(const char *pathname, const char *password, PWS_RESULT_CODE *rc)
 {
-    if (rc)
-        *rc = PWS_ERR_FAIL;
+    set_rc(rc, PWS_ERR_FAIL);
 
     FILE *dbfile = fopen(pathname, "rb");
     if (!dbfile)
     {
-        if (rc)
-            *rc = PWS_ERR_OPEN;
+        set_rc(rc, PWS_ERR_OPEN);
         return NULL;
     }
 
@@ -343,26 +598,28 @@ PWSAFE_EXTERN PWSHANDLE pws_db_open(const char *pathname, const char *password, 
 
     if (!db_read_header(dbfile, &header))
     {
-        if (rc)
-            *rc = PWS_ERR_OPEN;
+        set_rc(rc, PWS_ERR_OPEN);
         return NULL;
     }
 
     if (!db_check_password(&header, password))
     {
-        if (rc)
-            *rc = PWS_ERR_INCORRECT_PW;
+        set_rc(rc, PWS_ERR_INCORRECT_PW);
         return NULL;
     }
 
-    PwsDb *pdb = db_alloc();
-    pdb->db_file = dbfile;
-    memcpy(&pdb->db_header, &header, sizeof(pdb->db_header));
+    PwsDb *pdb = db_alloc(rc);
+    if (pdb)
+    {
+        pdb->db_file = dbfile;
+        memcpy(&pdb->db_header, &header, sizeof(pdb->db_header));
 
-    db_compute_key(pdb, password);
+        db_compute_key(pdb, password);
 
-    if (rc)
-        *rc = PWS_SUCCESS;
+        set_rc(rc, PWS_SUCCESS);
+    }
+
+
     return pdb;
 }
 
@@ -375,17 +632,44 @@ PWSAFE_EXTERN void pws_db_close(PWSHANDLE hdb, PWS_RESULT_CODE *rc)
     db_free(pdb);
 }
 
-PWSAFE_EXTERN _Bool pws_db_read_accounts(PWSHANDLE hdb, PWS_RESULT_CODE *rc)
+PWSAFE_EXTERN _Bool pws_db_read_accounts(PWSHANDLE hdb, PwsDbRecord **records, PWS_RESULT_CODE *rc)
 {
-    if (!check_hdb(hdb, NULL))
+    *records = NULL;
+
+    if (!check_hdb(hdb, rc))
         return false;
 
     PwsDb *pdb = (PwsDb *)hdb;
+    PwsDbRecord *phead = NULL, *p = NULL;
 
-    while (db_read_next_record(pdb, rc))
+    if (db_read_next_record(pdb, &p, rc))
     {
-//  PWSAFE_V2_NAME_MAGIC       
+        const char *ptitle = db_get_title(p);
+        if (ptitle == NULL)
+        {
+            // No title field == something is wrong
+            set_rc(rc, PWS_ERR_CORRUPT_DB);
+            free(p);
+            return false;
+        }
+        if (strcmp(PWSAFE_V2_NAME_MAGIC, ptitle) == 0)
+        {
+            pdb->db_vers = PWSAFE_DB_V2;
+            db_read_next_record(pdb, &p, rc);
+        }
+        else
+        {
+            pdb->db_vers = PWSAFE_DB_V1;
+        }
+
+        phead = p;
+        while (db_read_next_record(pdb, &p, rc))
+        {
+            p->next = phead;
+            phead = p;
+        };
     }
 
-    return false;
+    *records = phead;
+    return true;
 }

@@ -3,15 +3,11 @@
 
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #ifdef  __cplusplus
 extern "C" {
 #endif
-
-typedef enum {
-    PWSAFE_DB_V1,
-    PWSAFE_DB_V2,
-} PWS_DB_VERSION;
 
 typedef enum {
     PWS_SUCCESS = 0,
@@ -21,7 +17,8 @@ typedef enum {
     PWS_ERR_INVALID_ARG,  // Invalid function argument
     PWS_ERR_INVALID_HANDLE,  // Invalid handle
     PWS_ERR_CORRUPT_DB,  // Database file is corrupt
-    PWS_ERR_READ  // A read error occurred while reading the database, check `errno`
+    PWS_ERR_READ,  // A read error occurred while reading the database, check `errno`
+    PWS_ERR_ALLOC  // An error occurred allocating memory, check `errno`
 } PWS_RESULT_CODE;
 
 // future fields: CTIME = 0x7, MTIME = 0x8, ATIME = 0x9, LTIME = 0xa, POLICY = 0xb,
@@ -37,9 +34,31 @@ typedef enum
     FT_END = 0xff
 } PWS_FIELD_TYPE;
 
+struct PwsDbField;
+
+typedef struct PwsDbField
+{
+    struct PwsDbField *next;
+    uint8_t type;
+    char *value;
+} PwsDbField;
+
+struct PwsDbRecord;
+
+typedef struct PwsDbRecord
+{
+    struct PwsDbRecord *next;
+    PwsDbField *fields;
+} PwsDbRecord;
+
 #define PWSAFE_EXTERN
 
 #define PWSHANDLE void *
+
+/**
+ * Free memory that has been allocated for a returned value
+*/
+PWSAFE_EXTERN void pws_free_db_records(PwsDbRecord *p);
 
 /**
  * Open a Passwordsafe database file and reads the database header.
@@ -65,30 +84,31 @@ PWSAFE_EXTERN void pws_db_close(PWSHANDLE hdb, PWS_RESULT_CODE *rc);
 /**
  * Read all accounts from the database
  * \param[in] hdb Database handle
+ * \param[out] records Linked list of records read from database
  * \param[out] rc Optional result code, > 0 if operation failed.
  * \returns `true` if operation succeeded, `false` otherwise
+ * \note
+ * pws_free_db_records() must be called to free memory allocated to the database records,
+ * regardless of whether operation succeeds or fails.
  * \see pws_db_open()
 */
-PWSAFE_EXTERN _Bool pws_db_read_accounts(PWSHANDLE hdb, PWS_RESULT_CODE *rc);
+PWSAFE_EXTERN _Bool pws_db_read_accounts(PWSHANDLE hdb, PwsDbRecord **records, PWS_RESULT_CODE *rc);
 
 /**
- * Create a new PasswordSafe database
- * \param[in] version Version of the database format to create.
- *                    Recommended value is `PWSAFE_DB_V2`.
- *                    If `PWSAFE_DB_V1` is used data may be lost--see Note below
+ * Write a new Password Safe v2 database
  * \param[in] pathname The pathname of the account database
  * \param[in] password The database password
  * \param[out] rc Optional result code, > 0 if operation failed
  * \returns `true` if operation succeeded, `false` otherwise
  * \note
- * If `version` is set to `PWSAFE_DB_V1` and input fields containing data
+ * If account fields contain data that 
  * are ignored when writing the database, the operation will succeed,
  * but the result code will be set to `PWS_WARN_DATA_LOST`.
  * \note
  * pws_db_close() must be called on the handle that is returned.
  * \see pws_db_close()
  */
-PWSAFE_EXTERN _Bool pws_db_create(PWS_DB_VERSION version, const char *pathname,
+PWSAFE_EXTERN _Bool pws_db_write(const char *pathname,
     const char *password, PWS_RESULT_CODE *rc);
 
 #ifdef  __cplusplus
