@@ -7,6 +7,7 @@
 extern "C"
 {
     extern const char *trim_right(const char *pbegin, char *pend);
+    extern const char *get_default_user();
 }
 
 TEST(Test, TrimRight)
@@ -15,6 +16,27 @@ TEST(Test, TrimRight)
     EXPECT_STREQ("", trim_right(s.data(), s.data() + s.length()));
     s = "abc";
     EXPECT_STREQ("abc", trim_right(s.data(), s.data() + s.length()));
+}
+
+TEST(Test, GetDefaultUser)
+{
+    const char *save_PWSAFE_DEFAULT_USER = getenv("PWSAFE_DEFAULT_USER");
+    const char *save_USER = getenv("USER");
+    const char *save_LOGNAME = getenv("LOGNAME");
+    setenv("PWSAFE_DEFAULT_USER", "user1", 1);
+    setenv("USER", "user2", 1);
+    setenv("LOGNAME", "user3", 1);
+    EXPECT_STREQ("user1", get_default_user());
+    unsetenv("PWSAFE_DEFAULT_USER");
+    EXPECT_STREQ("user2", get_default_user());
+    unsetenv("USER");
+    EXPECT_STREQ("user3", get_default_user());
+    unsetenv("LOGNAME");
+    // This should be true unless someone runs unit tests with sudo
+    EXPECT_STREQ(save_USER, get_default_user());
+    if (save_PWSAFE_DEFAULT_USER) setenv("PWSAFE_DEFAULT_USER", save_PWSAFE_DEFAULT_USER, 0);
+    if (save_USER) setenv("USER", save_USER, 0);
+    if (save_LOGNAME) setenv("LOGNAME", save_LOGNAME, 0);
 }
 
 TEST(Test, OpenEmptyDbV1)
