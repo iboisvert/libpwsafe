@@ -10,8 +10,6 @@
 #include <pwd.h>
 #include <unistd.h>
 
-extern const char *trim_right(const char *pbegin, char *pend);
-
 // IMB 2023-01-01 Most of the code here is
 // adapted from code by Nicolas Dade https://github.com/nsd20463/pwsafe
 
@@ -67,7 +65,7 @@ static inline void swap_byte_order(Block b)
     *h = __builtin_bswap32(*h);
 }
 
-static const char *get_default_user()
+const char *get_default_user()
 {
     const char *dl = getenv("PWSAFE_DEFAULT_USER");
     if (!dl)
@@ -404,6 +402,15 @@ static _Bool db_read_next_v1_record(PwsDb *pdb, PwsDbField** fields, PWS_RESULT_
         p->next = phead;
         phead = p;
 
+        /*
+         * IMB 2023-01-10 From Rony Shapiro
+         * https://github.com/pwsafe/pwsafe/blob/master/docs/formatV1.txt
+         * Apparently as a hack to upgrade from previous versions, the Name field
+         * is actually two fields, "Title" and "Username", separated by
+         * SPLTCHR. Furthermore, if the Username is DEFUSERCHR, then it is
+         * replaced by the user's "default user name", as specified in
+         * options. It works, but is not a pretty sight.
+        */
         if (*pos == SPLIT_CHAR || *pos == DEFAULT_USER_CHAR)
         {
             p = alloc_field(FT_USER, NULL);
