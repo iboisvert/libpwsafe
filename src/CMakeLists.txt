@@ -2,7 +2,9 @@ find_package(Nettle REQUIRED)
 include_directories(${NETTLE_INCLUDE_DIR})
 
 list(APPEND SRC
+    block.c
     db.c
+    util.c
 )
 add_library(pwsafe ${SRC})
 target_link_libraries (pwsafe nettle)
