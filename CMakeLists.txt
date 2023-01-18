@@ -24,10 +24,14 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -Wall -Wextra")
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -ggdb -O0")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -ggdb -O0")
 
-include_directories(api)
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
+include_directories(api)
 include_directories(src)
 
+add_subdirectory(test)
 add_subdirectory(src)
 add_subdirectory(api)
-add_subdirectory(test)
+
+set(CPACK_COMPONENTS_ALL lib)
+set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
+include(CPack)

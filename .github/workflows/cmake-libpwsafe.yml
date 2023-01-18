@@ -1,0 +1,33 @@
+name: CMake workflow for libpwsafe
+
+on:
+  push:
+    branches: [ imb/ncurses ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: configure
+      run: cmake -DCMAKE_BUILD_TYPE:STRING=Release -B build
+    - name: build
+      run: cmake --build build -t all
+    - name: test
+      run: |
+        cd build
+        ctest
+    - name: package
+      run: |
+        cd build 
+        cpack -G RPM .
+    - name: copy artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: RPM package
+        path: |
+          build/*.rpm
+    #- name: make check
+    #  run: make check
+    #- name: make distcheck
+    #  run: make distcheck

@@ -1,1 +1,1 @@
-install(TARGETS pwsafe PUBLIC_HEADER)
+install(FILES pwsafe.h DESTINATION include/libpwsafe COMPONENT lib)
