@@ -8,8 +8,8 @@ jobs:
     steps:
     - name: setup environment
       run: |
-        apt-get -y update
-        apt-get -y install cmake gcc g++ nettle-dev rpm
+        sudo apt-get -y update
+        sudo apt-get -y install cmake gcc g++ nettle-dev rpm
     - uses: actions/checkout@v2
     - name: configure
       run: cmake -DCMAKE_BUILD_TYPE:STRING=Release -B build
