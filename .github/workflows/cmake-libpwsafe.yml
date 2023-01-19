@@ -1,6 +1,11 @@
 name: CMake workflow for libpwsafe
 
-on: push
+on: 
+  push:
+    branches: 
+      - main
+    tags:
+      - v*
 
 jobs:
   build:
@@ -24,13 +29,13 @@ jobs:
     - name: package
       run: |
         cd build 
-        cpack -G RPM
-    - name: copy artifacts
-      uses: actions/upload-artifact@v3
+        cpack -G DEB
+    - name: push release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
       with:
-        name: RPM package
-        path: |
-          build/*.rpm
+      with:
+        files: build/*.deb
     #- name: make check
     #  run: make check
     #- name: make distcheck

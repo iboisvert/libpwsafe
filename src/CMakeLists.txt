@@ -6,14 +6,25 @@ list(APPEND SRC
     db.c
     util.c
 )
-add_library(pwsafe ${SRC})
+add_library(objlib OBJECT ${SRC})
+
+add_library(pwsafeStatic $<TARGET_OBJECTS:objlib>)
+# On Windows, static lib is libpwsafe.lib, DLL is pwsafe.dll/.lib
+# On Linux, static lib is libpwsafe.a, SO is libpwsafe.so
+set_target_properties(pwsafeStatic PROPERTIES OUTPUT_NAME $<IF:$<BOOL:${WIN32}>,libpwsafe,pwsafe>)
+
+add_library(pwsafe SHARED $<TARGET_OBJECTS:objlib>)
 target_link_libraries (pwsafe nettle)
 
-install(TARGETS pwsafe ARCHIVE COMPONENT lib)
-#set (CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.11.1-0ubuntu7.2), ${LIBCURL}, libmagic1 (>= 1:5.25), libuuid1 (>= 2.17.2-0ubuntu1), libwxgtk3.0-gtk3-0v5 (>= 3.0.0-2), libxtst6 (>= 2:1.1.0-2), libxerces-c${XercesC_VER} (>= 3.1.0-1), libykpers-1-1 (>= 1.7.0-1), ${LIBQRENCODE}")
+install(TARGETS pwsafeStatic ARCHIVE COMPONENT lib)
+install(TARGETS pwsafe LIBRARY COMPONENT lib)
+
 set(CPACK_RPM_COMPONENT_INSTALL ON PARENT_SCOPE)
+# set(CPACK_RPM_PACKAGE_REQUIRES "")
 set(CPACK_RPM_LIB_PACKAGE_LICENSE "GPL-3.0" PARENT_SCOPE)
 set(CPACK_RPM_LIB_PACKAGE_GROUP "Unspecified" PARENT_SCOPE)
 set(CPACK_RPM_LIB_PACKAGE_VENDOR "Ian Boisvert" PARENT_SCOPE)
-# set(CPACK_RPM_PACKAGE_REQUIRES "")
-# set(CPACK_PACKAGE_DESCRIPTION_FILE "foo")
+
+set(CPACK_DEB_COMPONENT_INSTALL ON PARENT_SCOPE)
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.35-0ubuntu3.1), libnettle8 (>= 3.7.3-1build2)" PARENT_SCOPE)
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Ian Boisvert" PARENT_SCOPE)
