@@ -1,1 +1,1 @@
-install(FILES pwsafe.h DESTINATION include/libpwsafe COMPONENT lib)
+install(FILES pwsafe.h DESTINATION include/libpwsafe COMPONENT dev)
