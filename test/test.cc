@@ -112,11 +112,34 @@ TEST(Test, ReadDbV1Succeeds)
     PwsDbRecord *records;
     rc = (PWS_RESULT_CODE)-1;
     EXPECT_TRUE(pws_db_read_accounts(hdb, &records, &rc));
-    EXPECT_EQ(nullptr, records->next);
-    EXPECT_NE(nullptr, records->fields);
     EXPECT_EQ(PRC_SUCCESS, rc);
-    pws_free_db_records(records);
 
+    PwsDbRecord *rec = records;
+    EXPECT_NE(nullptr, rec->next);
+    EXPECT_NE(nullptr, rec->fields);
+    // \xAD is the V1 field split character
+    EXPECT_STREQ("title  \xAD  name", pws_rec_get_field(rec, FT_NAME));
+    EXPECT_EQ(nullptr, pws_rec_get_field(rec, FT_GROUP));
+    EXPECT_STREQ("title", pws_rec_get_field(rec, FT_TITLE));
+    EXPECT_STREQ("name", pws_rec_get_field(rec, FT_USER));
+    EXPECT_STREQ("password", pws_rec_get_field(rec, FT_PASSWORD));
+    EXPECT_STREQ("notes", pws_rec_get_field(rec, FT_NOTES));
+
+    rec = rec->next;
+    EXPECT_EQ(nullptr, rec->next);
+    EXPECT_NE(nullptr, rec->fields);
+    // \xA0 is the default user character
+    EXPECT_STREQ("group.title\xA0", pws_rec_get_field(rec, FT_NAME));
+    // IMB 2023-01-18 Nicolas Dade's pwsafe presents v2 records as 
+    // "group.title" but does not split v1 records
+    // into separate fields. I wonder if we should do this.
+    EXPECT_EQ(nullptr, pws_rec_get_field(rec, FT_GROUP));
+    EXPECT_STREQ("group.title", pws_rec_get_field(rec, FT_TITLE));
+    EXPECT_EQ(0, strcmp(pws_rec_get_field(rec, FT_USER), get_default_user()));
+    EXPECT_LT(0, strlen(pws_rec_get_field(rec, FT_PASSWORD)));
+    EXPECT_STREQ("", pws_rec_get_field(rec, FT_NOTES));
+
+    pws_free_db_records(records);
     pws_db_close(hdb, &rc);
 }
 
@@ -155,7 +178,7 @@ TEST(Test, WriteEmptyDatabaseSucceeds)
 {
     PWS_RESULT_CODE rc = (PWS_RESULT_CODE)-1;
     char pathname[L_tmpnam + 1];
-    tmpnam(pathname);
+    (void)tmpnam(pathname);
     const char *pw = "password";
     ASSERT_TRUE(pws_db_write(pathname, pw, nullptr, &rc));
     EXPECT_EQ(PRC_SUCCESS, rc);
@@ -182,7 +205,7 @@ TEST(Test, WriteFieldWithNoUUIDSucceeds)
 {
     PWS_RESULT_CODE rc = (PWS_RESULT_CODE)-1;
     char pathname[L_tmpnam + 1];
-    tmpnam(pathname);
+    (void)tmpnam(pathname);
     const char *pw = "password";
     char str[] = "title";
     PwsDbField title = {NULL, FT_TITLE, str};
