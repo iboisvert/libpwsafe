@@ -523,7 +523,7 @@ static _Bool db_read_next_v1_record(PwsDb *pdb, PwsDbField** fields, PWS_RESULT_
                     status = false;
                     goto done;
                 }
-                strncpy(p->value, default_user, len);
+                strncpy(p->value, default_user, len+1);
                 trim_right(p->value, p->value+len);
             }
             p->next = phead;
