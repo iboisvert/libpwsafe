@@ -178,7 +178,7 @@ TEST(Test, WriteEmptyDatabaseSucceeds)
 {
     PWS_RESULT_CODE rc = (PWS_RESULT_CODE)-1;
     char pathname[L_tmpnam + 1];
-    (void)tmpnam(pathname);
+    (void)!tmpnam(pathname);
     const char *pw = "password";
     ASSERT_TRUE(pws_db_write(pathname, pw, nullptr, &rc));
     EXPECT_EQ(PRC_SUCCESS, rc);
@@ -205,7 +205,7 @@ TEST(Test, WriteFieldWithNoUUIDSucceeds)
 {
     PWS_RESULT_CODE rc = (PWS_RESULT_CODE)-1;
     char pathname[L_tmpnam + 1];
-    (void)tmpnam(pathname);
+    (void)!tmpnam(pathname);
     const char *pw = "password";
     char str[] = "title";
     PwsDbField title = {NULL, FT_TITLE, str};
