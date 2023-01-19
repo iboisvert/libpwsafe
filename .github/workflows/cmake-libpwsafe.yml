@@ -5,8 +5,11 @@ on: push
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: ghcr.io/iboisvert/libpwsafe-dev:latest
     steps:
+    - name: setup environment
+      run: |
+        apt-get -y update
+        apt-get -y install cmake gcc g++ nettle-dev rpm
     - uses: actions/checkout@v2
     - name: configure
       run: cmake -DCMAKE_BUILD_TYPE:STRING=Release -B build
