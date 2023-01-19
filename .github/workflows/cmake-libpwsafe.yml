@@ -5,6 +5,7 @@ on: push
 jobs:
   build:
     runs-on: ubuntu-latest
+    container: ghcr.io/iboisvert/libpwsafe-dev:latest
     steps:
     - uses: actions/checkout@v2
     - name: configure
