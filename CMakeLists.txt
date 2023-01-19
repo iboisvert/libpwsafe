@@ -33,6 +33,6 @@ add_subdirectory(test)
 add_subdirectory(src)
 add_subdirectory(api)
 
-set(CPACK_COMPONENTS_ALL lib)
+set(CPACK_COMPONENTS_ALL "dev;runtime")
 set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
 include(CPack)
