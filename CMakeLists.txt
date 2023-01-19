@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.22)
 project(libpwsafe 
     VERSION 0.1.0 
     DESCRIPTION "Library for reading and writing Password Safe account database files" 
+    HOMEPAGE_URL "https://github.com/iboisvert/libpwsafe"
 )
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules")

@@ -14,7 +14,7 @@ target_link_libraries(
     pwsafe
     GTest::gtest_main
 )
-add_dependencies(libpwsafe-test pwsafe)
+add_dependencies(libpwsafe-test pwsafeStatic)
 
 include(GoogleTest)
 gtest_discover_tests(libpwsafe-test WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/../test")
