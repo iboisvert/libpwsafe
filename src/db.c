@@ -229,10 +229,10 @@ _Bool db_check_password(Header *h, const char *pw)
     return equal;
 }
 
-const char *pws_rec_get_field(PwsDbRecord *record, PWS_FIELD_TYPE ft)
+const char *pws_rec_get_field(const PwsDbRecord *record, PWS_FIELD_TYPE ft)
 {
     assert(record);
-    PwsDbField *field = record->fields;
+    const PwsDbField *field = record->fields;
     while (field != NULL && field->type != ft)
     {
         field = field->next;
@@ -244,11 +244,11 @@ const char *pws_rec_get_field(PwsDbRecord *record, PWS_FIELD_TYPE ft)
     }
     return retval;
 }
-static inline const char *rec_get_title(PwsDbRecord *record)
+static inline const char *rec_get_title(const PwsDbRecord *record)
 {
     return pws_rec_get_field(record, FT_TITLE);
 }
-static inline const char *rec_get_uuid(PwsDbRecord *record)
+static inline const char *rec_get_uuid(const PwsDbRecord *record)
 {
     return pws_rec_get_field(record, FT_UUID);
 }
