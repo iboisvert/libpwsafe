@@ -35,6 +35,8 @@ typedef enum
     FT_USER = 0x4,
     FT_NOTES = 0x5,
     FT_PASSWORD = 0x6,
+    FT_URL = 0x0d,
+    FT_EMAIL = 0x14,
     FT_END = 0xff
 } PWS_FIELD_TYPE;
 
@@ -61,7 +63,7 @@ typedef struct PwsDbRecord
  * Get a specific field from a database record
  * \returns The field value, `NULL` if the field does not exist in the record.
 */
-PWSAFE_EXTERN const char *pws_rec_get_field(PwsDbRecord *record, PWS_FIELD_TYPE ft);
+PWSAFE_EXTERN const char *pws_rec_get_field(const PwsDbRecord *record, PWS_FIELD_TYPE ft);
 
 /**
  * Free memory that has been allocated for a returned value
