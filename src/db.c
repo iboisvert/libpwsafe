@@ -8,6 +8,7 @@
 #ifdef HAVE_SYS_RANDOM_H
 #include <sys/random.h>
 #endif
+#include <nettle/sha2.h>
 
 // IMB 2023-01-01 Most of the code here is
 // adapted from code by Nicolas Dade https://github.com/nsd20463/pwsafe
@@ -23,7 +24,17 @@ static const char * const PWSAFE_V2_NAME_MAGIC =
     " !!!Version 2 File Format!!! Please upgrade to PasswordSafe 2.0 or later";
 static const char * const PWSAFE_V2_PASSWORD_MAGIC = "2.0";
 
-static inline void set_rc(PWS_RESULT_CODE *prc, PWS_RESULT_CODE rc)
+// Forward decls
+static PwsDbRecord *alloc_record();
+static PwsDbField *alloc_field(uint8_t type, char *value);
+static void free_fields(PwsDbField *p);
+
+const char *pws_get_version()
+{
+    return LIBPWSAFE_VERSION;
+}
+
+static inline void set_rc(PwsResultCode *prc, PwsResultCode rc)
 {
     if (prc) *prc = rc;
 }
@@ -37,29 +48,15 @@ static void init_pdb(PwsDb *pdb)
     memset_func(&pdb->db_header, 0, sizeof(Header));
 }
 
-static PwsDb *db_alloc(PWS_RESULT_CODE *rc)
+static PwsDbRecord *alloc_record()
 {
-    PwsDb *pdb = NULL;
-    pdb = malloc(sizeof(PwsDb));
-    if (!pdb)
+    PwsDbRecord *p = malloc(sizeof(PwsDbRecord));
+    if (p)
     {
-        set_rc(rc, PRC_ERR_ALLOC);
+        p->next = NULL;
+        p->fields = NULL;
     }
-    else
-    {
-        init_pdb(pdb);
-    }
-    return pdb;
-}
-
-static void db_free(PwsDb *pdb)
-{
-    if (pdb->db_file)
-    {
-        fclose(pdb->db_file);
-    }
-    memset_func(pdb, 0, sizeof(*pdb));
-    free(pdb);
+    return p;
 }
 
 static PwsDbField *alloc_field(uint8_t type, char *value)
@@ -79,9 +76,12 @@ static void free_fields(PwsDbField *p)
     while (p != NULL)
     {
         PwsDbField *pnext = p->next;
-        size_t len = strlen(p->value);
-        memset_func(p->value, 0, len);
-        free(p->value);
+        if (p->value)
+        {
+            size_t len = strlen(p->value);
+            memset_func(p->value, 0, len);
+            free(p->value);
+        }
         memset_func(p, 0, sizeof(*p));
         free(p);
         p = pnext;
@@ -95,7 +95,7 @@ static void free_record(PwsDbRecord *p)
     free(p);
 }
 
-static _Bool db_read_header(FILE *f, Header *h, PWS_RESULT_CODE *rc)
+static _Bool db_read_header(FILE *f, Header *h, PwsResultCode *rc)
 {
     assert(f);
     assert(h);
@@ -112,7 +112,7 @@ static _Bool db_read_header(FILE *f, Header *h, PWS_RESULT_CODE *rc)
     return true;
 }
 
-static _Bool db_write_header(PwsDb *pdb, PWS_RESULT_CODE *rc)
+static _Bool db_write_header(PwsDb *pdb, PwsResultCode *rc)
 {
     assert(pdb);
     FILE *f = pdb->db_file;
@@ -195,7 +195,7 @@ static inline _Bool generate_random(uint8_t *buf, size_t len)
 /**
  * Initialize a new database header
 */
-_Bool db_init_header(Header *h, const char *pw, PWS_RESULT_CODE *rc)
+_Bool db_init_header(Header *h, const char *pw, PwsResultCode *rc)
 {
     assert(h);
     assert(pw);
@@ -217,7 +217,7 @@ _Bool db_init_header(Header *h, const char *pw, PWS_RESULT_CODE *rc)
 
 }
 
-_Bool db_check_password(Header *h, const char *pw)
+_Bool db_check_password(Header *h, const char *pw, PwsResultCode *rc)
 {
     unsigned char test_hash[SHA1_DIGEST_SIZE];
     generate_hash(h->random, test_hash, pw);
@@ -226,10 +226,13 @@ _Bool db_check_password(Header *h, const char *pw)
 
     memset_func(test_hash, 0, sizeof(test_hash));
 
+    if (!equal)
+        set_rc(rc, PRC_ERR_INCORRECT_PW);
+
     return equal;
 }
 
-const char *pws_rec_get_field(const PwsDbRecord *record, PWS_FIELD_TYPE ft)
+const char *pws_rec_get_field(const PwsDbRecord *record, PwsFieldType ft)
 {
     assert(record);
     const PwsDbField *field = record->fields;
@@ -290,7 +293,7 @@ void db_encode_block(PwsDb *pdb, Block block)
     memcpy(pdb->cbc, block, BLOCK_SIZE);
 }
 
-static _Bool db_read_block(PwsDb *pdb, Block block, PWS_RESULT_CODE *rc)
+static _Bool db_read_block(PwsDb *pdb, Block block, PwsResultCode *rc)
 {
     assert(pdb);
 
@@ -314,7 +317,7 @@ static _Bool db_read_block(PwsDb *pdb, Block block, PWS_RESULT_CODE *rc)
     return true;
 }
 
-static _Bool db_write_block(PwsDb *pdb, Block block, PWS_RESULT_CODE *rc)
+static _Bool db_write_block(PwsDb *pdb, Block block, PwsResultCode *rc)
 {
     assert(pdb);
     assert(block);
@@ -332,7 +335,7 @@ static _Bool db_write_block(PwsDb *pdb, Block block, PWS_RESULT_CODE *rc)
     return true;
 }
 
-static _Bool db_read_next_field(PwsDb *pdb, PwsDbField **field, PWS_RESULT_CODE *rc)
+static _Bool db_read_next_field(PwsDb *pdb, PwsDbField **field, PwsResultCode *rc)
 {
     assert(field);
     *field = NULL;
@@ -391,7 +394,7 @@ static _Bool db_read_next_field(PwsDb *pdb, PwsDbField **field, PWS_RESULT_CODE 
     return true;
 }
 
-static _Bool db_write_next_field_values(PwsDb *pdb, const PWS_FIELD_TYPE type, const char *value, PWS_RESULT_CODE *rc)
+static _Bool db_write_next_field_values(PwsDb *pdb, const PwsFieldType type, const char *value, PwsResultCode *rc)
 {
     assert(pdb);
     assert(value);
@@ -426,7 +429,7 @@ static _Bool db_write_next_field_values(PwsDb *pdb, const PWS_FIELD_TYPE type, c
     return true;
 }
 
-static _Bool db_write_next_field(PwsDb *pdb, const PwsDbField *field, PWS_RESULT_CODE *rc)
+static _Bool db_write_next_field(PwsDb *pdb, const PwsDbField *field, PwsResultCode *rc)
 {
     return db_write_next_field_values(pdb, field->type, field->value, rc);
 }
@@ -434,7 +437,7 @@ static _Bool db_write_next_field(PwsDb *pdb, const PwsDbField *field, PWS_RESULT
 static const char SPLIT_CHAR = '\xAD';
 static const char DEFAULT_USER_CHAR = '\xA0';
 
-static _Bool db_read_next_v1_record(PwsDb *pdb, PwsDbField** fields, PWS_RESULT_CODE *rc)
+static _Bool db_read_next_v1_record(PwsDb *pdb, PwsDbField** fields, PwsResultCode *rc)
 {
     assert(fields);
     PwsDbField *phead = NULL, *p = NULL;
@@ -550,7 +553,7 @@ done:
     return status;
 }
 
-static _Bool db_read_next_v2_record(PwsDb *pdb, PwsDbField** fields, PWS_RESULT_CODE *rc)
+static _Bool db_read_next_v2_record(PwsDb *pdb, PwsDbField** fields, PwsResultCode *rc)
 {
     assert(fields);
 
@@ -590,7 +593,7 @@ done:
     return status;
 }
 
-static _Bool db_write_next_v1_record(PwsDb *pdb, const char *name, const char *password, const char *notes, PWS_RESULT_CODE *rc)
+static _Bool db_write_next_v1_record(PwsDb *pdb, const char *name, const char *password, const char *notes, PwsResultCode *rc)
 {
     assert(pdb);
     assert(name);
@@ -620,7 +623,7 @@ static const PwsDbField DB_FIELD_END = {NULL, FT_END, ""};
  * \note The `extras` parameter allows us to append missing data into the 
  * database record without modifying the object passed in by the user
 */
-static _Bool db_write_next_v2_record(PwsDb *pdb, const PwsDbField* fields, const PwsDbField *extras, PWS_RESULT_CODE *rc)
+static _Bool db_write_next_v2_record(PwsDb *pdb, const PwsDbField* fields, const PwsDbField *extras, PwsResultCode *rc)
 {
     assert(pdb);
     assert(fields);
@@ -668,7 +671,7 @@ static _Bool db_write_next_v2_record(PwsDb *pdb, const PwsDbField* fields, const
     return true;
 }
 
-static _Bool db_read_next_record(PwsDb *pdb, PwsDbRecord** record, PWS_RESULT_CODE *rc)
+static _Bool db_read_next_record(PwsDb *pdb, PwsDbRecord** record, PwsResultCode *rc)
 {
     PwsDbField *fields = NULL;
     _Bool status = false;
@@ -683,7 +686,7 @@ static _Bool db_read_next_record(PwsDb *pdb, PwsDbRecord** record, PWS_RESULT_CO
     }
     if (status)
     {
-        *record = malloc(sizeof(PwsDbRecord));
+        *record = alloc_record();
         PwsDbRecord *prec = *record;
         if (!prec)
         {
@@ -691,7 +694,6 @@ static _Bool db_read_next_record(PwsDb *pdb, PwsDbRecord** record, PWS_RESULT_CO
             free_fields(fields);
             return false;
         }
-        prec->next = NULL;
         prec->fields = fields;
     }
     else if (*rc == PRC_ERR_EOF)
@@ -703,7 +705,7 @@ static _Bool db_read_next_record(PwsDb *pdb, PwsDbRecord** record, PWS_RESULT_CO
     return status;
 }
 
-static _Bool db_write_next_record(PwsDb *pdb, const PwsDbRecord* record, PwsDbField *extras, PWS_RESULT_CODE *rc)
+static _Bool db_write_next_record(PwsDb *pdb, const PwsDbRecord* record, PwsDbField *extras, PwsResultCode *rc)
 {
     assert(pdb);
     assert(record);
@@ -717,7 +719,7 @@ static _Bool db_write_next_record(PwsDb *pdb, const PwsDbRecord* record, PwsDbFi
     return true;
 }
 
-static _Bool db_write_v2_ident_record(PwsDb *pdb, PWS_RESULT_CODE *rc)
+static _Bool db_write_v2_ident_record(PwsDb *pdb, PwsResultCode *rc)
 {
     return db_write_next_v1_record(pdb, PWSAFE_V2_NAME_MAGIC, PWSAFE_V2_PASSWORD_MAGIC, "", rc);
 }
@@ -737,7 +739,7 @@ static void db_compute_key(PwsDb *pdb, const char *pw)
 }
 
 /** Sanity checks */
-static _Bool check_invalid_args(_Bool test, PWS_RESULT_CODE *rc)
+static _Bool check_invalid_args(_Bool test, PwsResultCode *rc)
 {
     if (!test)
     {
@@ -747,7 +749,7 @@ static _Bool check_invalid_args(_Bool test, PWS_RESULT_CODE *rc)
     return true;
 }
 
-static _Bool check_hdb(PWSHANDLE hdb, PWS_RESULT_CODE *rc)
+static _Bool check_hdb(PWSHANDLE hdb, PwsResultCode *rc)
 {
     PwsDb *pdb = (PwsDb *)hdb;
     if (memcmp(pdb->magic, DB_MAGIC, sizeof(DB_MAGIC)) != 0)
@@ -780,71 +782,54 @@ PWSAFE_EXTERN void pws_free_db_records(PwsDbRecord *p)
     }
 }
 
-PWSAFE_EXTERN PWSHANDLE pws_db_open(const char *pathname, const char *password, PWS_RESULT_CODE *rc)
+/**
+ * Check if `password` unlocks the account database at `pathname`
+ * \param [in] pathname The pathname of the account database
+ * \param [in] password The database password
+ * \param[out] rc Optional result code, set if operation fails.
+ * \returns `true` if password is correct, `false` otherwise.
+ */
+PWSAFE_EXTERN _Bool pws_db_check_password(const char *pathname, const char *password, PwsResultCode *rc)
 {
     if (!check_invalid_args(pathname && password, rc))
         return false;
 
-    PWS_RESULT_CODE local_rc = PRC_SUCCESS;
+    PwsResultCode local_rc = PRC_SUCCESS;
     eval_sys_byte_order();
 
     FILE *f = fopen(pathname, "rb");
     if (!f)
     {
         set_rc(rc, PRC_ERR_OPEN);
-        return NULL;
+        return false;
     }
 
     Header header;
 
-    if (!db_read_header(f, &header, &local_rc))
-    {
-        return NULL;
-    }
+    _Bool status = db_read_header(f, &header, &local_rc)
+        && db_check_password(&header, password, &local_rc);
 
-    if (!db_check_password(&header, password))
-    {
-        set_rc(rc, PRC_ERR_INCORRECT_PW);
-        return NULL;
-    }
-
-    PwsDb *pdb = db_alloc(rc);
-    if (pdb)
-    {
-        pdb->db_file = f;
-        memcpy(&pdb->db_header, &header, sizeof(pdb->db_header));
-
-        db_compute_key(pdb, password);
-    }
+    fclose(f);
 
     set_rc(rc, local_rc);
-    return pdb;
+    return status;
 }
 
-PWSAFE_EXTERN void pws_db_close(PWSHANDLE hdb, PWS_RESULT_CODE *rc)
-{
-    if (!check_invalid_args(hdb, rc)
-        || !check_hdb(hdb, rc))
-        return;
-
-    // Trash memory in case client tries to reuse invalid pointer
-    PwsDb *pdb = (PwsDb *)hdb;
-    db_free(pdb);
-}
-
-PWSAFE_EXTERN _Bool pws_db_read_accounts(PWSHANDLE hdb, PwsDbRecord **records, PWS_RESULT_CODE *rc)
+static _Bool db_read_accounts(PWSHANDLE hdb, PwsDbRecord **records, PwsResultCode *rc)
 {
     if (!check_invalid_args(hdb && records, rc)
         || !check_hdb(hdb, rc))
         return false;
 
-    PWS_RESULT_CODE local_rc = PRC_SUCCESS;
+    PwsResultCode local_rc = PRC_SUCCESS;
     *records = NULL;
 
     PwsDb *pdb = (PwsDb *)hdb;
     PwsDbRecord *phead = NULL, *p = NULL;
 
-    if (db_read_next_record(pdb, &p, &local_rc))
+    // Use a while loop because if we read the V2 magic record
+    // we want to skip that and read the next record
+    while (db_read_next_record(pdb, &p, &local_rc))
     {
         const char *ptitle = rec_get_title(p);
         if (ptitle == NULL)
@@ -858,7 +843,7 @@ PWSAFE_EXTERN _Bool pws_db_read_accounts(PWSHANDLE hdb, PwsDbRecord **records, P
         {
             free_record(p);
             pdb->db_vers = PWSAFE_DB_V2;
-            db_read_next_record(pdb, &p, &local_rc);
+            continue;
         }
         else
         {
@@ -871,6 +856,8 @@ PWSAFE_EXTERN _Bool pws_db_read_accounts(PWSHANDLE hdb, PwsDbRecord **records, P
             p->next = phead;
             phead = p;
         };
+
+        break;
     }
 
     *records = phead;
@@ -917,13 +904,55 @@ static _Bool db_ensure_record_has_uuid(PwsDbRecord *rec, PwsDbRecord *records, u
     return false;
 }
 
-PWSAFE_EXTERN _Bool pws_db_write(const char *pathname,
-    const char *password, PwsDbRecord *records, PWS_RESULT_CODE *rc)
+_Bool pws_db_read(const char *pathname, const char *password, PwsDbRecord **records, PwsResultCode *rc)
+{
+    if (!check_invalid_args(pathname && password && records, rc))
+        return false;
+
+    *records = NULL;
+
+    PwsResultCode local_rc = PRC_SUCCESS;
+    eval_sys_byte_order();
+
+    FILE *f = fopen(pathname, "rb");
+    if (!f)
+    {
+        set_rc(rc, PRC_ERR_OPEN);
+        return NULL;
+    }
+
+    Header header;
+    
+    _Bool status = db_read_header(f, &header, &local_rc)
+        && db_check_password(&header, password, &local_rc);
+    if (!status)
+    {
+        fclose(f);
+        goto done;
+    }
+
+
+    PwsDb pdb;
+    init_pdb(&pdb);
+    pdb.db_file = f;
+    memcpy(&pdb.db_header, &header, sizeof(pdb.db_header));
+
+    db_compute_key(&pdb, password);
+
+    status = db_read_accounts(&pdb, records, &local_rc);
+
+done:
+    set_rc(rc, local_rc);
+    return status;
+}
+
+_Bool pws_db_write(const char *pathname,
+    const char *password, PwsDbRecord *records, PwsResultCode *rc)
 {
     if (!check_invalid_args(pathname && password, rc))
         return false;
 
-    PWS_RESULT_CODE local_rc = PRC_SUCCESS;
+    PwsResultCode local_rc = PRC_SUCCESS;
     eval_sys_byte_order();
 
     FILE * f = fopen(pathname, "wb");

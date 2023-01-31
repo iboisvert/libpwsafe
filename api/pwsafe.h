@@ -10,7 +10,7 @@
 extern "C" {
 #endif
 
-typedef enum PWS_RESULT_CODE {
+typedef enum PwsResultCode {
     PRC_SUCCESS = 0,
     PRC_ERR_FAIL,  // Generic failure
     PRC_ERR_OPEN,  // File open error, check `errno`
@@ -23,7 +23,7 @@ typedef enum PWS_RESULT_CODE {
     PRC_ERR_ALLOC,  // An error occurred allocating memory, check `errno`
     PRC_ERR_INIT_RANDOM,  // An error occurred generating random data to initialize the database header
     PRC_ERR_EOF,  // End-of-file encountered while reading
-} PWS_RESULT_CODE;
+} PwsResultCode;
 
 // future fields: CTIME = 0x7, MTIME = 0x8, ATIME = 0x9, LTIME = 0xa, POLICY = 0xb,
 typedef enum
@@ -37,8 +37,9 @@ typedef enum
     FT_PASSWORD = 0x6,
     FT_URL = 0x0d,
     FT_EMAIL = 0x14,
+    FT_FILEPATH = 0x65,
     FT_END = 0xff
-} PWS_FIELD_TYPE;
+} PwsFieldType;
 
 typedef struct PwsDbField
 {
@@ -59,11 +60,14 @@ typedef struct PwsDbRecord
 
 #define PWSHANDLE void *
 
+/** Get libpwsafe version */
+PWSAFE_EXTERN const char *pws_get_version();
+
 /**
  * Get a specific field from a database record
  * \returns The field value, `NULL` if the field does not exist in the record.
 */
-PWSAFE_EXTERN const char *pws_rec_get_field(const PwsDbRecord *record, PWS_FIELD_TYPE ft);
+PWSAFE_EXTERN const char *pws_rec_get_field(const PwsDbRecord *record, PwsFieldType ft);
 
 /**
  * Free memory that has been allocated for a returned value
@@ -71,38 +75,23 @@ PWSAFE_EXTERN const char *pws_rec_get_field(const PwsDbRecord *record, PWS_FIELD
 PWSAFE_EXTERN void pws_free_db_records(PwsDbRecord *p);
 
 /**
- * Open a Password Safe database file and read the database header.
+ * Check if `password` unlocks the account database at `pathname`
  * \param [in] pathname The pathname of the account database
  * \param [in] password The database password
  * \param[out] rc Optional result code, set if operation fails.
- * \returns Database handle if successful, `NULL` otherwise.
- * \note
- * pws_db_close() must be called on the handle that is returned.
- * \see pws_db_close()
+ * \returns `true` if password is correct, `false` otherwise.
  */
-PWSAFE_EXTERN PWSHANDLE pws_db_open(const char *pathname, const char *password, PWS_RESULT_CODE *rc);
+PWSAFE_EXTERN _Bool pws_db_check_password(const char *pathname, const char *password, PwsResultCode *rc);
 
 /**
- * Close the database and release resources. 
- * Handle `hdb` is invalid after calling this function.
- * \param [in] hdb Database handle
- * \param[out] rc Optional result code, set if operation fails.
- * \see pws_db_open()
-*/
-PWSAFE_EXTERN void pws_db_close(PWSHANDLE hdb, PWS_RESULT_CODE *rc);
-
-/**
- * Read all accounts from the database
- * \param[in] hdb Database handle
+ * Open a Password Safe database file and read the database header.
+ * \param [in] pathname The pathname of the account database
+ * \param [in] password The database password
  * \param[out] records Linked list of records read from database
  * \param[out] rc Optional result code, set if operation fails.
  * \returns `true` if operation succeeded, `false` otherwise
- * \note
- * pws_free_db_records() must be called to free memory allocated to the database records,
- * regardless of whether operation succeeds or fails.
- * \see pws_db_open()
-*/
-PWSAFE_EXTERN _Bool pws_db_read_accounts(PWSHANDLE hdb, PwsDbRecord **records, PWS_RESULT_CODE *rc);
+ */
+PWSAFE_EXTERN _Bool pws_db_read(const char *pathname, const char *password, PwsDbRecord **records, PwsResultCode *rc);
 
 /**
  * Write a new Password Safe v2 database
@@ -131,7 +120,7 @@ PWSAFE_EXTERN _Bool pws_db_read_accounts(PWSHANDLE hdb, PwsDbRecord **records, P
  * and `rc` will be set to `PWS_ERR_INVALID_ARG`.
  */
 PWSAFE_EXTERN _Bool pws_db_write(const char *pathname,
-    const char *password, PwsDbRecord *records, PWS_RESULT_CODE *rc);
+    const char *password, PwsDbRecord *records, PwsResultCode *rc);
 
 #ifdef  __cplusplus
 }
