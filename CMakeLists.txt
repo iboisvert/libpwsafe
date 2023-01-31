@@ -4,6 +4,7 @@ project(libpwsafe
     DESCRIPTION "Library for reading and writing Password Safe account database files" 
     HOMEPAGE_URL "https://github.com/iboisvert/libpwsafe"
 )
+set (LIBPWSAFE_VERSION "${CMAKE_PROJECT_VERSION}")
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules")
 
@@ -18,12 +19,16 @@ enable_testing()
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_CXX_STANDARD 17)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -Wall -Wextra")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -Wall -Wextra")
-# set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -ggdb -O0 -fsanitize=address,undefined")
-# set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -ggdb -O0 -fsanitize=address,undefined")
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -ggdb -O0")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -ggdb -O0")
+add_compile_options(
+    -fPIC -Wall -Wextra
+    "$<$<CONFIG:DEBUG>:-ggdb;-O0;-fsanitize=address,undefined;-fno-omit-frame-pointer>"
+)
+add_compile_definitions(
+    "$<$<CONFIG:RELEASE>:NDEBUG>"
+)
+add_link_options(
+    "$<$<CONFIG:DEBUG>:-fsanitize=address,undefined>"
+)
 
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 include_directories(api)
