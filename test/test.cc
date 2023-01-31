@@ -6,6 +6,11 @@
 #include <stdlib.h>
 #include <string>
 
+TEST(Test, Version)
+{
+    ASSERT_STREQ(LIBPWSAFE_VERSION, pws_get_version());
+}
+
 TEST(Test, ByteOrderIsSupported)
 {
     const uint32_t dw = 0x00000001;
@@ -35,8 +40,11 @@ TEST(Test, GetDefaultUserSucceeds)
     unsetenv("USER");
     EXPECT_STREQ("user3", get_default_user());
     unsetenv("LOGNAME");
-    // This should be true unless someone runs unit tests with sudo
-    EXPECT_STREQ(save_USER, get_default_user());
+    if (save_USER) 
+    {
+        // This should be true unless someone runs unit tests with sudo
+        EXPECT_STREQ(save_USER, get_default_user());
+    }
     if (save_PWSAFE_DEFAULT_USER) setenv("PWSAFE_DEFAULT_USER", save_PWSAFE_DEFAULT_USER, 0);
     if (save_USER) setenv("USER", save_USER, 0);
     if (save_LOGNAME) setenv("LOGNAME", save_LOGNAME, 0);
@@ -66,52 +74,64 @@ TEST(Test, BlockEncodeDecodeSucceeds)
     ASSERT_EQ(0l, memcmp("datadata", block, 8));
 }
 
+TEST(Test, CheckPassword)
+{
+    PwsResultCode rc = (PwsResultCode)-1;
+    _Bool result = pws_db_check_password("data/test-v2-empty.dat", "improbable", &rc);
+    ASSERT_FALSE(result);
+    EXPECT_EQ(PRC_ERR_INCORRECT_PW, rc);
+
+    rc = (PwsResultCode)-1;
+    result = pws_db_check_password("data/test-v2-empty.dat", "password", &rc);
+    ASSERT_TRUE(result);
+    EXPECT_EQ(PRC_SUCCESS, rc);
+}
+
 TEST(Test, OpenFailsNoFileFails)
 {
-    PWS_RESULT_CODE rc = (PWS_RESULT_CODE)-1;
-    PWSHANDLE hdb = pws_db_open("(nonexistent", "password", &rc);
-    ASSERT_EQ(nullptr, hdb);
+    PwsResultCode rc = (PwsResultCode)-1;
+    PwsDbRecord *records;
+    _Bool status = pws_db_read("/nonexistent", "password", &records, &rc);
+    ASSERT_FALSE(status);
     EXPECT_EQ(PRC_ERR_OPEN, rc);
 }
 
 TEST(Test, OpenEmptyDbV1Succeeds)
 {
-    PWS_RESULT_CODE rc = (PWS_RESULT_CODE)-1;
-    PWSHANDLE hdb = pws_db_open("data/test-v1-empty.dat", "password", &rc);
-    ASSERT_NE(nullptr, hdb);
+    PwsResultCode rc = (PwsResultCode)-1;
+    PwsDbRecord *records;
+    _Bool status = pws_db_read("data/test-v1-empty.dat", "password", &records, &rc);
+    ASSERT_TRUE(status);
     EXPECT_EQ(PRC_SUCCESS, rc);
 
-    pws_db_close(hdb, &rc);
+    pws_free_db_records(records);
 }
 
 TEST(Test, OpenEmptyDbV2Succeeds)
 {
-    PWS_RESULT_CODE rc = (PWS_RESULT_CODE)-1;
-    PWSHANDLE hdb = pws_db_open("data/test-v2-empty.dat", "password", &rc);
-    ASSERT_NE(nullptr, hdb);
+    PwsResultCode rc = (PwsResultCode)-1;
+    PwsDbRecord *records;
+    _Bool status = pws_db_read("data/test-v2-empty.dat", "password", &records, &rc);
+    ASSERT_TRUE(status);
     EXPECT_EQ(PRC_SUCCESS, rc);
-
-    pws_db_close(hdb, &rc);
+    EXPECT_EQ(nullptr, records);
 }
 
 TEST(Test, OpenEmptyDbV2WithIncorrectPasswordFails)
 {
-    PWS_RESULT_CODE rc = (PWS_RESULT_CODE)-1;
-    PWSHANDLE hdb = pws_db_open("data/test-v2-empty.dat", "foobar", &rc);
-    ASSERT_EQ(nullptr, hdb);
+    PwsResultCode rc = (PwsResultCode)-1;
+    PwsDbRecord *records;
+    _Bool status = pws_db_read("data/test-v2-empty.dat", "foobar", &records, &rc);
+    ASSERT_FALSE(status);
     EXPECT_EQ(PRC_ERR_INCORRECT_PW, rc);
 }
 
 TEST(Test, ReadDbV1Succeeds)
 {
-    PWS_RESULT_CODE rc = (PWS_RESULT_CODE)-1;
-    PWSHANDLE hdb = pws_db_open("data/test-v1.dat", "password", &rc);
-    ASSERT_NE(nullptr, hdb);
-    EXPECT_EQ(PRC_SUCCESS, rc);
-
+    PwsResultCode rc = (PwsResultCode)-1;
     PwsDbRecord *records;
-    rc = (PWS_RESULT_CODE)-1;
-    EXPECT_TRUE(pws_db_read_accounts(hdb, &records, &rc));
+    _Bool status = pws_db_read("data/test-v1.dat", "password", &records, &rc);
+    ASSERT_TRUE(status);
     EXPECT_EQ(PRC_SUCCESS, rc);
 
     PwsDbRecord *rec = records;
@@ -140,60 +160,53 @@ TEST(Test, ReadDbV1Succeeds)
     EXPECT_STREQ("", pws_rec_get_field(rec, FT_NOTES));
 
     pws_free_db_records(records);
-    pws_db_close(hdb, &rc);
 }
 
 TEST(Test, ReadDbV2Succeeds)
 {
-    PWS_RESULT_CODE rc = (PWS_RESULT_CODE)-1;
-    PWSHANDLE hdb = pws_db_open("data/test-v2.dat", "password", &rc);
-    ASSERT_NE(nullptr, hdb);
-    EXPECT_EQ(PRC_SUCCESS, rc);
-
+    PwsResultCode rc = (PwsResultCode)-1;
     PwsDbRecord *records;
-    rc = (PWS_RESULT_CODE)-1;
-    EXPECT_TRUE(pws_db_read_accounts(hdb, &records, &rc));
+    _Bool status = pws_db_read("data/test-v2.dat", "password", &records, &rc);
+    ASSERT_TRUE(status);
+    EXPECT_EQ(PRC_SUCCESS, rc);
     EXPECT_EQ(nullptr, records->next);
     EXPECT_NE(nullptr, records->fields);
-    EXPECT_EQ(PRC_SUCCESS, rc);
     EXPECT_STREQ("group", pws_rec_get_field(records, FT_GROUP));
     EXPECT_STREQ("account", pws_rec_get_field(records, FT_TITLE));
     EXPECT_STREQ("password", pws_rec_get_field(records, FT_PASSWORD));
     EXPECT_STREQ("notes", pws_rec_get_field(records, FT_NOTES));
 
     pws_free_db_records(records);
-    pws_db_close(hdb, &rc);
 }
 
 TEST(Test, InitHeaderSucceeds)
 {
-    PWS_RESULT_CODE rc = (PWS_RESULT_CODE)-1;
+    PwsResultCode rc = (PwsResultCode)-1;
     const char *pw = "password";
     Header h;
     ASSERT_TRUE(db_init_header(&h, pw, &rc));
-    ASSERT_TRUE(db_check_password(&h, pw));
+    ASSERT_TRUE(db_check_password(&h, pw, &rc));
 }
 
 TEST(Test, WriteEmptyDatabaseSucceeds)
 {
-    PWS_RESULT_CODE rc = (PWS_RESULT_CODE)-1;
+    PwsResultCode rc = (PwsResultCode)-1;
     char pathname[L_tmpnam + 1];
     (void)!tmpnam(pathname);
     const char *pw = "password";
     ASSERT_TRUE(pws_db_write(pathname, pw, nullptr, &rc));
     EXPECT_EQ(PRC_SUCCESS, rc);
 
-    rc = (PWS_RESULT_CODE)-1;
-    PwsDbRecord *records = nullptr;
-    PWSHANDLE hdb = pws_db_open(pathname, "password", &rc);
-    ASSERT_NE(nullptr, hdb);
-    EXPECT_TRUE(pws_db_read_accounts(hdb, &records, &rc));
+    rc = (PwsResultCode)-1;
+    PwsDbRecord *records;
+    _Bool status = pws_db_read(pathname, "password", &records, &rc);
+    ASSERT_TRUE(status);
     EXPECT_EQ(nullptr, records);
     EXPECT_EQ(PRC_SUCCESS, rc);
-    pws_db_close(hdb, &rc);
+    pws_free_db_records(records);
 
     struct stat st;
-    int status = stat(pathname, &st);
+    status = stat(pathname, &st);
     EXPECT_EQ(0, status);
     if (status == 0)
     {
@@ -203,7 +216,7 @@ TEST(Test, WriteEmptyDatabaseSucceeds)
 
 TEST(Test, WriteFieldWithNoUUIDSucceeds)
 {
-    PWS_RESULT_CODE rc = (PWS_RESULT_CODE)-1;
+    PwsResultCode rc = (PwsResultCode)-1;
     char pathname[L_tmpnam + 1];
     (void)!tmpnam(pathname);
     const char *pw = "password";
@@ -214,13 +227,11 @@ TEST(Test, WriteFieldWithNoUUIDSucceeds)
     ASSERT_TRUE(pws_db_write(pathname, pw, &rec, &rc));
     EXPECT_EQ(PRC_SUCCESS, rc);
 
-    rc = (PWS_RESULT_CODE)-1;
+    rc = (PwsResultCode)-1;
 
-    PWSHANDLE hdb = pws_db_open(pathname, "password", &rc);
-    ASSERT_NE(nullptr, hdb);
-
-    PwsDbRecord *records = nullptr;
-    EXPECT_TRUE(pws_db_read_accounts(hdb, &records, &rc));
+    PwsDbRecord *records;
+    _Bool status = pws_db_read(pathname, "password", &records, &rc);
+    ASSERT_TRUE(status);
     EXPECT_NE(nullptr, records);
     EXPECT_EQ(PRC_SUCCESS, rc);
     if (records)
@@ -229,5 +240,4 @@ TEST(Test, WriteFieldWithNoUUIDSucceeds)
     }
 
     pws_free_db_records(records);
-    pws_db_close(hdb, &rc);
 }
