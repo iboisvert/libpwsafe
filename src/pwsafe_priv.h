@@ -14,9 +14,6 @@ extern "C"
 {
 #endif
 
-// Forward declaration
-enum PwsResultCode;
-
 // Prevent memset from being optimized out
 typedef void *(*fmemset)(void *, int, size_t);
 extern volatile fmemset memset_func;
@@ -53,8 +50,6 @@ typedef struct Header
 
 typedef struct PwsDb
 {
-    uint8_t magic[16];
-    uint8_t ver; // Struct version
     FILE *db_file;
     Header db_header;
     PWSAFE_DB_VERSION db_vers;
@@ -74,8 +69,8 @@ void zero_block(Block block);
 /**
  * Initialize a new database header
  */
-extern _Bool db_init_header(struct Header *h, const char *pw, enum PwsResultCode *rc);
-extern _Bool db_check_password(struct Header *h, const char *pw, enum PwsResultCode *rc);
+extern _Bool db_init_header(struct Header *h, const char *pw, int *rc);
+extern _Bool db_check_password(struct Header *h, const char *pw, int *rc);
 extern void db_encode_block(struct PwsDb *pdb, Block block);
 extern void db_decode_block(struct PwsDb *pdb, Block block);
 
