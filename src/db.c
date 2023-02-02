@@ -16,10 +16,6 @@
 // Prevent memset from being optimized out
 volatile fmemset memset_func = memset;
 
-// A magic number used to verify the handle in API calls
-static const uint8_t DB_MAGIC[16] = {
-    0x05, 0xf5, 0x4d, 0x91, 0xe8, 0xb6, 0x44, 0x4b, 0xb4, 0xed, 0xba, 0xd4, 0x2a, 0x5e, 0x03, 0x49};
-
 static const char * const PWSAFE_V2_NAME_MAGIC = 
     " !!!Version 2 File Format!!! Please upgrade to PasswordSafe 2.0 or later";
 static const char * const PWSAFE_V2_PASSWORD_MAGIC = "2.0";
@@ -34,15 +30,13 @@ const char *pws_get_version()
     return LIBPWSAFE_VERSION;
 }
 
-static inline void set_rc(PwsResultCode *prc, PwsResultCode rc)
+static inline void set_rc(int *prc, int rc)
 {
     if (prc) *prc = rc;
 }
 
 static void init_pdb(PwsDb *pdb)
 {
-    memcpy(pdb->magic, DB_MAGIC, sizeof(DB_MAGIC));
-    pdb->ver = 1;
     pdb->db_vers = -1;
     pdb->db_file = NULL;
     memset_func(&pdb->db_header, 0, sizeof(Header));
@@ -95,7 +89,7 @@ static void free_record(PwsDbRecord *p)
     free(p);
 }
 
-static _Bool db_read_header(FILE *f, Header *h, PwsResultCode *rc)
+static _Bool db_read_header(FILE *f, Header *h, int *rc)
 {
     assert(f);
     assert(h);
@@ -112,7 +106,7 @@ static _Bool db_read_header(FILE *f, Header *h, PwsResultCode *rc)
     return true;
 }
 
-static _Bool db_write_header(PwsDb *pdb, PwsResultCode *rc)
+static _Bool db_write_header(PwsDb *pdb, int *rc)
 {
     assert(pdb);
     FILE *f = pdb->db_file;
@@ -195,7 +189,7 @@ static inline _Bool generate_random(uint8_t *buf, size_t len)
 /**
  * Initialize a new database header
 */
-_Bool db_init_header(Header *h, const char *pw, PwsResultCode *rc)
+_Bool db_init_header(Header *h, const char *pw, int *rc)
 {
     assert(h);
     assert(pw);
@@ -217,7 +211,7 @@ _Bool db_init_header(Header *h, const char *pw, PwsResultCode *rc)
 
 }
 
-_Bool db_check_password(Header *h, const char *pw, PwsResultCode *rc)
+_Bool db_check_password(Header *h, const char *pw, int *rc)
 {
     unsigned char test_hash[SHA1_DIGEST_SIZE];
     generate_hash(h->random, test_hash, pw);
@@ -293,7 +287,7 @@ void db_encode_block(PwsDb *pdb, Block block)
     memcpy(pdb->cbc, block, BLOCK_SIZE);
 }
 
-static _Bool db_read_block(PwsDb *pdb, Block block, PwsResultCode *rc)
+static _Bool db_read_block(PwsDb *pdb, Block block, int *rc)
 {
     assert(pdb);
 
@@ -317,7 +311,7 @@ static _Bool db_read_block(PwsDb *pdb, Block block, PwsResultCode *rc)
     return true;
 }
 
-static _Bool db_write_block(PwsDb *pdb, Block block, PwsResultCode *rc)
+static _Bool db_write_block(PwsDb *pdb, Block block, int *rc)
 {
     assert(pdb);
     assert(block);
@@ -335,7 +329,7 @@ static _Bool db_write_block(PwsDb *pdb, Block block, PwsResultCode *rc)
     return true;
 }
 
-static _Bool db_read_next_field(PwsDb *pdb, PwsDbField **field, PwsResultCode *rc)
+static _Bool db_read_next_field(PwsDb *pdb, PwsDbField **field, int *rc)
 {
     assert(field);
     *field = NULL;
@@ -394,7 +388,7 @@ static _Bool db_read_next_field(PwsDb *pdb, PwsDbField **field, PwsResultCode *r
     return true;
 }
 
-static _Bool db_write_next_field_values(PwsDb *pdb, const PwsFieldType type, const char *value, PwsResultCode *rc)
+static _Bool db_write_next_field_values(PwsDb *pdb, const PwsFieldType type, const char *value, int *rc)
 {
     assert(pdb);
     assert(value);
@@ -429,7 +423,7 @@ static _Bool db_write_next_field_values(PwsDb *pdb, const PwsFieldType type, con
     return true;
 }
 
-static _Bool db_write_next_field(PwsDb *pdb, const PwsDbField *field, PwsResultCode *rc)
+static _Bool db_write_next_field(PwsDb *pdb, const PwsDbField *field, int *rc)
 {
     return db_write_next_field_values(pdb, field->type, field->value, rc);
 }
@@ -437,7 +431,7 @@ static _Bool db_write_next_field(PwsDb *pdb, const PwsDbField *field, PwsResultC
 static const char SPLIT_CHAR = '\xAD';
 static const char DEFAULT_USER_CHAR = '\xA0';
 
-static _Bool db_read_next_v1_record(PwsDb *pdb, PwsDbField** fields, PwsResultCode *rc)
+static _Bool db_read_next_v1_record(PwsDb *pdb, PwsDbField** fields, int *rc)
 {
     assert(fields);
     PwsDbField *phead = NULL, *p = NULL;
@@ -553,7 +547,7 @@ done:
     return status;
 }
 
-static _Bool db_read_next_v2_record(PwsDb *pdb, PwsDbField** fields, PwsResultCode *rc)
+static _Bool db_read_next_v2_record(PwsDb *pdb, PwsDbField** fields, int *rc)
 {
     assert(fields);
 
@@ -593,7 +587,7 @@ done:
     return status;
 }
 
-static _Bool db_write_next_v1_record(PwsDb *pdb, const char *name, const char *password, const char *notes, PwsResultCode *rc)
+static _Bool db_write_next_v1_record(PwsDb *pdb, const char *name, const char *password, const char *notes, int *rc)
 {
     assert(pdb);
     assert(name);
@@ -623,7 +617,7 @@ static const PwsDbField DB_FIELD_END = {NULL, FT_END, ""};
  * \note The `extras` parameter allows us to append missing data into the 
  * database record without modifying the object passed in by the user
 */
-static _Bool db_write_next_v2_record(PwsDb *pdb, const PwsDbField* fields, const PwsDbField *extras, PwsResultCode *rc)
+static _Bool db_write_next_v2_record(PwsDb *pdb, const PwsDbField* fields, const PwsDbField *extras, int *rc)
 {
     assert(pdb);
     assert(fields);
@@ -671,7 +665,7 @@ static _Bool db_write_next_v2_record(PwsDb *pdb, const PwsDbField* fields, const
     return true;
 }
 
-static _Bool db_read_next_record(PwsDb *pdb, PwsDbRecord** record, PwsResultCode *rc)
+static _Bool db_read_next_record(PwsDb *pdb, PwsDbRecord** record, int *rc)
 {
     PwsDbField *fields = NULL;
     _Bool status = false;
@@ -705,7 +699,7 @@ static _Bool db_read_next_record(PwsDb *pdb, PwsDbRecord** record, PwsResultCode
     return status;
 }
 
-static _Bool db_write_next_record(PwsDb *pdb, const PwsDbRecord* record, PwsDbField *extras, PwsResultCode *rc)
+static _Bool db_write_next_record(PwsDb *pdb, const PwsDbRecord* record, PwsDbField *extras, int *rc)
 {
     assert(pdb);
     assert(record);
@@ -719,7 +713,7 @@ static _Bool db_write_next_record(PwsDb *pdb, const PwsDbRecord* record, PwsDbFi
     return true;
 }
 
-static _Bool db_write_v2_ident_record(PwsDb *pdb, PwsResultCode *rc)
+static _Bool db_write_v2_ident_record(PwsDb *pdb, int *rc)
 {
     return db_write_next_v1_record(pdb, PWSAFE_V2_NAME_MAGIC, PWSAFE_V2_PASSWORD_MAGIC, "", rc);
 }
@@ -739,7 +733,7 @@ static void db_compute_key(PwsDb *pdb, const char *pw)
 }
 
 /** Sanity checks */
-static _Bool check_invalid_args(_Bool test, PwsResultCode *rc)
+static _Bool check_invalid_args(_Bool test, int *rc)
 {
     if (!test)
     {
@@ -748,29 +742,6 @@ static _Bool check_invalid_args(_Bool test, PwsResultCode *rc)
     }
     return true;
 }
-
-static _Bool check_hdb(PWSHANDLE hdb, PwsResultCode *rc)
-{
-    PwsDb *pdb = (PwsDb *)hdb;
-    if (memcmp(pdb->magic, DB_MAGIC, sizeof(DB_MAGIC)) != 0)
-    {
-        set_rc(rc, PRC_ERR_INVALID_HANDLE);
-        return false;
-    }
-    return true;
-}
-
-// static _Bool init_done = false;
-
-// PWSAFE_EXTERN void pws_init()
-// {
-//     if (!init_done)
-//     {
-//         _Bool is_le = (union{uint16_t n; char c[2];}){1}.c[0] ? true : false;
-//         if (!is_le) host_to_le = be_to_le;
-//         init_done = true;
-//     }
-// }
 
 PWSAFE_EXTERN void pws_free_db_records(PwsDbRecord *p)
 {
@@ -789,12 +760,12 @@ PWSAFE_EXTERN void pws_free_db_records(PwsDbRecord *p)
  * \param[out] rc Optional result code, set if operation fails.
  * \returns `true` if password is correct, `false` otherwise.
  */
-PWSAFE_EXTERN _Bool pws_db_check_password(const char *pathname, const char *password, PwsResultCode *rc)
+PWSAFE_EXTERN _Bool pws_db_check_password(const char *pathname, const char *password, int *rc)
 {
     if (!check_invalid_args(pathname && password, rc))
         return false;
 
-    PwsResultCode local_rc = PRC_SUCCESS;
+    int local_rc = PRC_SUCCESS;
     eval_sys_byte_order();
 
     FILE *f = fopen(pathname, "rb");
@@ -815,16 +786,11 @@ PWSAFE_EXTERN _Bool pws_db_check_password(const char *pathname, const char *pass
     return status;
 }
 
-static _Bool db_read_accounts(PWSHANDLE hdb, PwsDbRecord **records, PwsResultCode *rc)
+static _Bool db_read_accounts(PwsDb *pdb, PwsDbRecord **records, int *rc)
 {
-    if (!check_invalid_args(hdb && records, rc)
-        || !check_hdb(hdb, rc))
-        return false;
-
-    PwsResultCode local_rc = PRC_SUCCESS;
+    int local_rc = PRC_SUCCESS;
     *records = NULL;
 
-    PwsDb *pdb = (PwsDb *)hdb;
     PwsDbRecord *phead = NULL, *p = NULL;
 
     // Use a while loop because if we read the V2 magic record
@@ -904,14 +870,14 @@ static _Bool db_ensure_record_has_uuid(PwsDbRecord *rec, PwsDbRecord *records, u
     return false;
 }
 
-_Bool pws_db_read(const char *pathname, const char *password, PwsDbRecord **records, PwsResultCode *rc)
+_Bool pws_db_read(const char *pathname, const char *password, PwsDbRecord **records, int *rc)
 {
     if (!check_invalid_args(pathname && password && records, rc))
         return false;
 
     *records = NULL;
 
-    PwsResultCode local_rc = PRC_SUCCESS;
+    int local_rc = PRC_SUCCESS;
     eval_sys_byte_order();
 
     FILE *f = fopen(pathname, "rb");
@@ -947,12 +913,12 @@ done:
 }
 
 _Bool pws_db_write(const char *pathname,
-    const char *password, PwsDbRecord *records, PwsResultCode *rc)
+    const char *password, PwsDbRecord *records, int *rc)
 {
     if (!check_invalid_args(pathname && password, rc))
         return false;
 
-    PwsResultCode local_rc = PRC_SUCCESS;
+    int local_rc = PRC_SUCCESS;
     eval_sys_byte_order();
 
     FILE * f = fopen(pathname, "wb");

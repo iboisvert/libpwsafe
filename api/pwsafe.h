@@ -58,8 +58,6 @@ typedef struct PwsDbRecord
 #define PWSAFE_EXTERN extern
 #endif
 
-#define PWSHANDLE void *
-
 /** Get libpwsafe version */
 PWSAFE_EXTERN const char *pws_get_version();
 
@@ -81,7 +79,7 @@ PWSAFE_EXTERN void pws_free_db_records(PwsDbRecord *p);
  * \param[out] rc Optional result code, set if operation fails.
  * \returns `true` if password is correct, `false` otherwise.
  */
-PWSAFE_EXTERN _Bool pws_db_check_password(const char *pathname, const char *password, PwsResultCode *rc);
+PWSAFE_EXTERN _Bool pws_db_check_password(const char *pathname, const char *password, int *rc);
 
 /**
  * Open a Password Safe database file and read the database header.
@@ -91,7 +89,7 @@ PWSAFE_EXTERN _Bool pws_db_check_password(const char *pathname, const char *pass
  * \param[out] rc Optional result code, set if operation fails.
  * \returns `true` if operation succeeded, `false` otherwise
  */
-PWSAFE_EXTERN _Bool pws_db_read(const char *pathname, const char *password, PwsDbRecord **records, PwsResultCode *rc);
+PWSAFE_EXTERN _Bool pws_db_read(const char *pathname, const char *password, PwsDbRecord **records, int *rc);
 
 /**
  * Write a new Password Safe v2 database
@@ -120,7 +118,7 @@ PWSAFE_EXTERN _Bool pws_db_read(const char *pathname, const char *password, PwsD
  * and `rc` will be set to `PWS_ERR_INVALID_ARG`.
  */
 PWSAFE_EXTERN _Bool pws_db_write(const char *pathname,
-    const char *password, PwsDbRecord *records, PwsResultCode *rc);
+    const char *password, PwsDbRecord *records, int *rc);
 
 #ifdef  __cplusplus
 }

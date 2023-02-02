@@ -76,12 +76,12 @@ TEST(Test, BlockEncodeDecodeSucceeds)
 
 TEST(Test, CheckPassword)
 {
-    PwsResultCode rc = (PwsResultCode)-1;
+    int rc = -1;
     _Bool result = pws_db_check_password("data/test-v2-empty.dat", "improbable", &rc);
     ASSERT_FALSE(result);
     EXPECT_EQ(PRC_ERR_INCORRECT_PW, rc);
 
-    rc = (PwsResultCode)-1;
+    rc = (int)-1;
     result = pws_db_check_password("data/test-v2-empty.dat", "password", &rc);
     ASSERT_TRUE(result);
     EXPECT_EQ(PRC_SUCCESS, rc);
@@ -89,7 +89,7 @@ TEST(Test, CheckPassword)
 
 TEST(Test, OpenFailsNoFileFails)
 {
-    PwsResultCode rc = (PwsResultCode)-1;
+    int rc = -1;
     PwsDbRecord *records;
     _Bool status = pws_db_read("/nonexistent", "password", &records, &rc);
     ASSERT_FALSE(status);
@@ -98,7 +98,7 @@ TEST(Test, OpenFailsNoFileFails)
 
 TEST(Test, OpenEmptyDbV1Succeeds)
 {
-    PwsResultCode rc = (PwsResultCode)-1;
+    int rc = -1;
     PwsDbRecord *records;
     _Bool status = pws_db_read("data/test-v1-empty.dat", "password", &records, &rc);
     ASSERT_TRUE(status);
@@ -109,7 +109,7 @@ TEST(Test, OpenEmptyDbV1Succeeds)
 
 TEST(Test, OpenEmptyDbV2Succeeds)
 {
-    PwsResultCode rc = (PwsResultCode)-1;
+    int rc = -1;
     PwsDbRecord *records;
     _Bool status = pws_db_read("data/test-v2-empty.dat", "password", &records, &rc);
     ASSERT_TRUE(status);
@@ -119,7 +119,7 @@ TEST(Test, OpenEmptyDbV2Succeeds)
 
 TEST(Test, OpenEmptyDbV2WithIncorrectPasswordFails)
 {
-    PwsResultCode rc = (PwsResultCode)-1;
+    int rc = -1;
     PwsDbRecord *records;
     _Bool status = pws_db_read("data/test-v2-empty.dat", "foobar", &records, &rc);
     ASSERT_FALSE(status);
@@ -128,7 +128,7 @@ TEST(Test, OpenEmptyDbV2WithIncorrectPasswordFails)
 
 TEST(Test, ReadDbV1Succeeds)
 {
-    PwsResultCode rc = (PwsResultCode)-1;
+    int rc = -1;
     PwsDbRecord *records;
     _Bool status = pws_db_read("data/test-v1.dat", "password", &records, &rc);
     ASSERT_TRUE(status);
@@ -164,7 +164,7 @@ TEST(Test, ReadDbV1Succeeds)
 
 TEST(Test, ReadDbV2Succeeds)
 {
-    PwsResultCode rc = (PwsResultCode)-1;
+    int rc = -1;
     PwsDbRecord *records;
     _Bool status = pws_db_read("data/test-v2.dat", "password", &records, &rc);
     ASSERT_TRUE(status);
@@ -181,7 +181,7 @@ TEST(Test, ReadDbV2Succeeds)
 
 TEST(Test, InitHeaderSucceeds)
 {
-    PwsResultCode rc = (PwsResultCode)-1;
+    int rc = -1;
     const char *pw = "password";
     Header h;
     ASSERT_TRUE(db_init_header(&h, pw, &rc));
@@ -190,14 +190,14 @@ TEST(Test, InitHeaderSucceeds)
 
 TEST(Test, WriteEmptyDatabaseSucceeds)
 {
-    PwsResultCode rc = (PwsResultCode)-1;
+    int rc = -1;
     char pathname[L_tmpnam + 1];
     (void)!tmpnam(pathname);
     const char *pw = "password";
     ASSERT_TRUE(pws_db_write(pathname, pw, nullptr, &rc));
     EXPECT_EQ(PRC_SUCCESS, rc);
 
-    rc = (PwsResultCode)-1;
+    rc = (int)-1;
     PwsDbRecord *records;
     _Bool status = pws_db_read(pathname, "password", &records, &rc);
     ASSERT_TRUE(status);
@@ -216,7 +216,7 @@ TEST(Test, WriteEmptyDatabaseSucceeds)
 
 TEST(Test, WriteFieldWithNoUUIDSucceeds)
 {
-    PwsResultCode rc = (PwsResultCode)-1;
+    int rc = -1;
     char pathname[L_tmpnam + 1];
     (void)!tmpnam(pathname);
     const char *pw = "password";
@@ -227,7 +227,7 @@ TEST(Test, WriteFieldWithNoUUIDSucceeds)
     ASSERT_TRUE(pws_db_write(pathname, pw, &rec, &rc));
     EXPECT_EQ(PRC_SUCCESS, rc);
 
-    rc = (PwsResultCode)-1;
+    rc = (int)-1;
 
     PwsDbRecord *records;
     _Bool status = pws_db_read(pathname, "password", &records, &rc);
