@@ -18,6 +18,23 @@ TEST(Test, ByteOrderIsSupported)
     EXPECT_TRUE(pdw[0] || pdw[3]);
 }
 
+TEST(Test, UuidBinToHex)
+{
+    uint8_t uuid[16] = {0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef};
+    char suuid[33] = "0";
+    suuid[32] = 0;
+    uuid_bin_to_hex(uuid, suuid);
+    EXPECT_STREQ("0123456789ABCDEF0123456789ABCDEF", suuid);
+}
+
+TEST(Test, UuidHexToBin)
+{
+    char suuid[] = "0123456789abcdef0123456789abcdef";
+    uint8_t uuid[16] = {0};
+    uuid_hex_to_bin(suuid, uuid);
+    EXPECT_EQ(0, memcmp("\x01\x23\x45\x67\x89\xab\xcd\xef\x01\x23\x45\x67\x89\xab\xcd\xef", uuid, 16));
+}
+
 TEST(Test, TrimRight)
 {
     std::string s{"\n\r\t "};
@@ -214,29 +231,58 @@ TEST(Test, WriteEmptyDatabaseSucceeds)
     }
 }
 
-TEST(Test, WriteFieldWithNoUUIDSucceeds)
+TEST(Test, WriteRecordWithNoUuidSucceeds)
 {
     int rc = -1;
     char pathname[L_tmpnam + 1];
     (void)!tmpnam(pathname);
-    const char *pw = "password";
-    char str[] = "title";
-    PwsDbField title = {NULL, FT_TITLE, str};
-    PwsDbRecord rec = {NULL, &title};
+    char password[] = "password", title[] = "title";
+    PwsDbField title_rec = {NULL, FT_TITLE, title};
+    PwsDbRecord rec = {NULL, &title_rec};
 
-    ASSERT_TRUE(pws_db_write(pathname, pw, &rec, &rc));
+    ASSERT_TRUE(pws_db_write(pathname, password, &rec, &rc));
     EXPECT_EQ(PRC_SUCCESS, rc);
 
     rc = (int)-1;
 
     PwsDbRecord *records;
-    _Bool status = pws_db_read(pathname, "password", &records, &rc);
+    _Bool status = pws_db_read(pathname, password, &records, &rc);
     ASSERT_TRUE(status);
     EXPECT_NE(nullptr, records);
     EXPECT_EQ(PRC_SUCCESS, rc);
     if (records)
     {
-        EXPECT_STREQ("title", pws_rec_get_field(records, FT_TITLE));
+        EXPECT_STREQ(title, pws_rec_get_field(records, FT_TITLE));
+        EXPECT_NE(nullptr, pws_rec_get_field(records, FT_UUID));
+        EXPECT_EQ(32, strlen(pws_rec_get_field(records, FT_UUID)));
+    }
+
+    pws_free_db_records(records);
+}
+
+
+TEST(Test, WriteRecordWithUuidSucceeds)
+{
+    int rc = -1;
+    char pathname[L_tmpnam + 1];
+    (void)!tmpnam(pathname);
+    char password[] = "password", title[] = "title", uuid[] = "0123456789ABCDEF0123456789ABCDEF";
+    PwsDbField title_rec = {NULL, FT_TITLE, title}, uuid_rec = {&title_rec, FT_UUID, uuid};
+    PwsDbRecord rec = {NULL, &uuid_rec};
+
+    ASSERT_TRUE(pws_db_write(pathname, password, &rec, &rc));
+    EXPECT_EQ(PRC_SUCCESS, rc);
+
+    rc = (int)-1;
+
+    PwsDbRecord *records;
+    _Bool status = pws_db_read(pathname, password, &records, &rc);
+    ASSERT_TRUE(status);
+    EXPECT_NE(nullptr, records);
+    EXPECT_EQ(PRC_SUCCESS, rc);
+    if (records)
+    {
+        EXPECT_STREQ(uuid, pws_rec_get_field(records, FT_UUID));
     }
 
     pws_free_db_records(records);

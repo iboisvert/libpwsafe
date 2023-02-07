@@ -2,11 +2,13 @@
 #include "pwsafe_priv.h"
 #include <assert.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #ifdef HAVE_PWUID
 #include <sys/types.h>
 #include <pwd.h>
 #endif
 #include <unistd.h>
+#include <errno.h>
 
 enum SYS_BYTE_ORDER sys_byte_order;
 
@@ -74,4 +76,34 @@ const char *get_default_user()
         dl = "";
     }
     return dl;
+}
+
+// Used when converting to hex
+static const char HEX_DIGIT[] = "0123456789ABCDEF";
+
+void uuid_bin_to_hex(const uint8_t *uuid, char *suuid)
+{
+    for (size_t i = 16; i-- != 0; )
+    {
+        unsigned char c = uuid[i];
+        suuid[i*2] = HEX_DIGIT[c>>4];
+        suuid[i*2+1] = HEX_DIGIT[c&0x0f];
+    }
+}
+
+_Bool uuid_hex_to_bin(const char *suuid, uint8_t *uuid)
+{
+    errno = 0;
+    char byte[3] = {0, 0, 0};
+    for (size_t i = 0; i < 16; ++i)
+    {
+        byte[0] = suuid[2*i];
+        byte[1] = suuid[2*i+1];
+        uuid[i] = strtol(byte, NULL, 16);
+        if (errno)
+        {
+            return false;
+        }
+    }
+    return true;
 }

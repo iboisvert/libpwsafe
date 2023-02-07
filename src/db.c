@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <unistd.h>
 #ifdef HAVE_SYS_RANDOM_H
 #include <sys/random.h>
@@ -367,7 +368,7 @@ static _Bool db_read_next_field(PwsDb *pdb, PwsDbField **field, int *rc)
         if (!db_read_block(pdb, block, rc))
         {
             free(str);
-            if (*rc == PRC_ERR_EOF)
+            if (rc && *rc == PRC_ERR_EOF)
             {
                 set_rc(rc, PRC_ERR_CORRUPT_DB);
             }
@@ -376,6 +377,22 @@ static _Bool db_read_next_field(PwsDb *pdb, PwsDbField **field, int *rc)
         memcpy(str + i * BLOCK_SIZE, block, BLOCK_SIZE);
     }
     str[len] = 0;
+
+    // UUID is stored in the database in binary,
+    // convert to text for convenience
+    if (type == FT_UUID)
+    {
+        char *uuid = realloc(str, 33);
+        if (!uuid)
+        {
+            free(str);
+            set_rc(rc, PRC_ERR_ALLOC);
+            return false;
+        }
+        uuid_bin_to_hex((unsigned char *)uuid, uuid);
+        str = uuid;
+        str[32] = 0;
+    }
 
     *field = alloc_field(type, str);
     if (!*field)
@@ -395,7 +412,7 @@ static _Bool db_write_next_field_values(PwsDb *pdb, const PwsFieldType type, con
 
     if (!value) return true;
 
-    const uint32_t len = (uint32_t)strlen(value);
+    const uint32_t len = (type == FT_UUID) ? 16 : (uint32_t)strlen(value);
 
     Block block;
     make_block_le(block, type, len);
@@ -403,7 +420,22 @@ static _Bool db_write_next_field_values(PwsDb *pdb, const PwsFieldType type, con
     if (!db_write_block(pdb, block, rc))
         return false;
 
-    const char *p = value, *pend = p + len;
+    const char *p = NULL;
+
+    // UUID is stored in the database in binary,
+    // convert from text
+    char uuid[16];
+    if (type == FT_UUID)
+    {
+        uuid_hex_to_bin(value, (unsigned char *)uuid);
+        p = uuid;
+    }
+    else
+    {
+        p = value;
+    }
+
+    const char *pend = p + len;
     for ( ; p < pend-BLOCK_SIZE; p += BLOCK_SIZE)
     {
         memcpy(block, p, BLOCK_SIZE);
@@ -743,6 +775,33 @@ static _Bool check_invalid_args(_Bool test, int *rc)
     return true;
 }
 
+static _Bool check_invalid_uuid(PwsDbRecord *prec, int *rc)
+{
+    while (prec != NULL)
+    {
+        const char *value = pws_rec_get_field(prec, FT_UUID);
+        if (value)
+        {
+            size_t len = strlen(value);
+            if (len != 32)
+            {
+                set_rc(rc, PRC_ERR_INVALID_ARG);
+                return false;
+            }
+            for (size_t i = 0; i < len; ++i)
+            {
+                if (!isxdigit(value[i]))
+                {
+                    set_rc(rc, PRC_ERR_INVALID_ARG);
+                    return false;
+                }
+            }
+        }
+        prec = prec->next;
+    }
+    return true;
+}
+
 PWSAFE_EXTERN void pws_free_db_records(PwsDbRecord *p)
 {
     while (p != NULL)
@@ -831,14 +890,14 @@ static _Bool db_read_accounts(PwsDb *pdb, PwsDbRecord **records, int *rc)
     return true;
 }
 
-static _Bool db_ensure_record_has_uuid(PwsDbRecord *rec, PwsDbRecord *records, uint8_t *uuid)
+static _Bool db_ensure_record_has_uuid(PwsDbRecord *rec, PwsDbRecord *records, char *uuid)
 {
     if (rec_get_uuid(rec) == NULL)
     {
         _Bool is_unique = false;
         do
-        { 
-            if (!generate_random(uuid, 16))
+        {
+            if (!generate_random((unsigned char *)uuid, 16))
             {
                 // It is probably better to write the record
                 // without an UUID than to fail.
@@ -846,6 +905,8 @@ static _Bool db_ensure_record_has_uuid(PwsDbRecord *rec, PwsDbRecord *records, u
                 // return false;
                 break;
             }
+            uuid_bin_to_hex((unsigned char *)uuid, uuid);
+            uuid[32] = 0;
             PwsDbRecord *r = records;
             while (r != NULL)
             {
@@ -918,6 +979,9 @@ _Bool pws_db_write(const char *pathname,
     if (!check_invalid_args(pathname && password, rc))
         return false;
 
+    if (!check_invalid_uuid(records, rc))
+        return false;
+
     int local_rc = PRC_SUCCESS;
     eval_sys_byte_order();
 
@@ -955,12 +1019,12 @@ _Bool pws_db_write(const char *pathname,
     while (rec != NULL)
     {
         PwsDbField *extras = NULL;
-        uint8_t uuid[17];
-        uuid[16] = 0;
+        char uuid[33];
+        uuid[32] = 0;
         PwsDbField uuid_field = {
             NULL,
             FT_UUID,
-            (char *)uuid
+            uuid
         };
 
         if (db_ensure_record_has_uuid(rec, records, uuid))

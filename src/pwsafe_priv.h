@@ -66,6 +66,12 @@ void block_le_to_sys(Block b);
 /** Write zeros to block */
 void zero_block(Block block);
 
+// UUID conversion
+/** Convert 16-byte binary UUID to 32-byte hex string. Can convert in-place. */
+void uuid_bin_to_hex(const uint8_t *uuid, char *suuid);
+/** Convert 32-byte hex string to 16-byte binary UUID. `suuid` and `uuid` must not be equal. */
+_Bool uuid_hex_to_bin(const char *suuid, uint8_t *uuid);
+
 /**
  * Initialize a new database header
  */
