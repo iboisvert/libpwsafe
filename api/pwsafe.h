@@ -16,7 +16,6 @@ typedef enum PwsResultCode {
     PRC_ERR_OPEN,  // File open error, check `errno`
     PRC_ERR_INCORRECT_PW,  // Incorrect password supplied to open database
     PRC_ERR_INVALID_ARG,  // Invalid function argument
-    PRC_ERR_INVALID_HANDLE,  // Invalid handle
     PRC_ERR_CORRUPT_DB,  // Database file is corrupt
     PRC_ERR_READ,  // An error occurred while reading the database, check `errno`
     PRC_ERR_WRITE,  // An error occurred while writing the database, check `errno`
