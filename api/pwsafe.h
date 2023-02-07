@@ -87,6 +87,8 @@ PWSAFE_EXTERN _Bool pws_db_check_password(const char *pathname, const char *pass
  * \param[out] records Linked list of records read from database
  * \param[out] rc Optional result code, set if operation fails.
  * \returns `true` if operation succeeded, `false` otherwise
+ * \note
+ * Fields of type `FT_UUID` have form `0123456789ABCDEF0123456789ABCDEF`
  */
 PWSAFE_EXTERN _Bool pws_db_read(const char *pathname, const char *password, PwsDbRecord **records, int *rc);
 
@@ -109,12 +111,19 @@ PWSAFE_EXTERN _Bool pws_db_read(const char *pathname, const char *password, PwsD
  * and `next` is not `NULL`, the function will return `false`
  * and `rc` will be set to `PWS_ERR_INVALID_ARG`.
  * \note
- * The "default user character" from Password Safe 1.x 
- * is not respected in the FT_NAME field.
- * \note
  * If the `FT_TITLE` field is not present or is empty,
  * the function will return `false`
  * and `rc` will be set to `PWS_ERR_INVALID_ARG`.
+ * \note
+ * If any record has a field of type `FT_UUID` with a value that is not of 
+ * form `0123456789ABCDEF0123456789ABCDEF`, the function will return `false`
+ * and `rc` will be set to `PWS_ERR_INVALID_ARG`.
+ * 
+ * A field of type `FT_UUID` with a unique value will be generated 
+ * for any record that does not already contain this field.
+ * \note
+ * The "default user character" from Password Safe 1.x 
+ * is not respected in the FT_NAME field.
  */
 PWSAFE_EXTERN _Bool pws_db_write(const char *pathname,
     const char *password, PwsDbRecord *records, int *rc);
