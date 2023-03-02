@@ -15,7 +15,7 @@ include(CheckFunctionExists)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules")
 
-INCLUDE(CheckIncludeFiles)
+find_package(Doxygen)
 CHECK_INCLUDE_FILES("sys/random.h" HAVE_SYS_RANDOM_H)
 CHECK_FUNCTION_EXISTS("getpwuid" HAVE_PWUID)
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/config.h.in" "${CMAKE_CURRENT_BINARY_DIR}/config.h")
@@ -42,7 +42,7 @@ add_subdirectory(src)
 add_subdirectory(api)
 
 set(CPACK_VERBATIM_VARIABLES YES)
-set(CPACK_COMPONENTS_ALL "dev;runtime")
+set(CPACK_COMPONENTS_ALL "dev;runtime;docs")
 set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
 
 set(CPACK_SOURCE_GENERATOR "TGZ")
