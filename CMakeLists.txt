@@ -10,12 +10,16 @@ set (LIBPWSAFE_VERSION "${CMAKE_PROJECT_VERSION}")
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_CXX_STANDARD 17)
 
+option(PWSAFE_BUILD_DOCS "Build documentation (needs Doxygen)" ON)
+
 include(CheckIncludeFiles)
 include(CheckFunctionExists)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules")
 
-find_package(Doxygen)
+if(PWSAFE_BUILD_DOCS)
+    find_package(Doxygen)
+endif()
 CHECK_INCLUDE_FILES("sys/random.h" HAVE_SYS_RANDOM_H)
 CHECK_FUNCTION_EXISTS("getpwuid" HAVE_PWUID)
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/config.h.in" "${CMAKE_CURRENT_BINARY_DIR}/config.h")
