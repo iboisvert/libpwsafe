@@ -1,4 +1,6 @@
-/* Copyright 2023 Ian Boisvert */
+/** \file pwsafe.h
+ *  Copyright 2023 Ian Boisvert 
+ */
 #ifndef HAVE_PWSAFE_H
 #define HAVE_PWSAFE_H
 
@@ -10,21 +12,23 @@
 extern "C" {
 #endif
 
+/** \brief Result codes returned from API functions. */
 typedef enum PwsResultCode {
-    PRC_SUCCESS = 0,
-    PRC_ERR_FAIL,  // Generic failure
-    PRC_ERR_OPEN,  // File open error, check `errno`
-    PRC_ERR_INCORRECT_PW,  // Incorrect password supplied to open database
-    PRC_ERR_INVALID_ARG,  // Invalid function argument
-    PRC_ERR_CORRUPT_DB,  // Database file is corrupt
-    PRC_ERR_READ,  // An error occurred while reading the database, check `errno`
-    PRC_ERR_WRITE,  // An error occurred while writing the database, check `errno`
-    PRC_ERR_ALLOC,  // An error occurred allocating memory, check `errno`
-    PRC_ERR_INIT_RANDOM,  // An error occurred generating random data to initialize the database header
-    PRC_ERR_EOF,  // End-of-file encountered while reading
+    PRC_SUCCESS = 0,  ///< Generic success
+    PRC_ERR_FAIL,  ///< Generic failure
+    PRC_ERR_OPEN,  ///< File open error, check `errno`
+    PRC_ERR_INCORRECT_PW,  ///< Incorrect password supplied to open database
+    PRC_ERR_INVALID_ARG,  ///< Invalid function argument
+    PRC_ERR_CORRUPT_DB,  ///< Database file is corrupt
+    PRC_ERR_READ,  ///< An error occurred while reading the database, check `errno`
+    PRC_ERR_WRITE,  ///< An error occurred while writing the database, check `errno`
+    PRC_ERR_ALLOC,  ///< An error occurred allocating memory, check `errno`
+    PRC_ERR_INIT_RANDOM,  ///< An error occurred generating random data to initialize the database header
+    PRC_ERR_EOF,  ///< End-of-file encountered while reading
 } PwsResultCode;
 
 // future fields: CTIME = 0x7, MTIME = 0x8, ATIME = 0x9, LTIME = 0xa, POLICY = 0xb,
+/** \brief Password Safe database field types */
 typedef enum
 {
     FT_NAME = 0,
@@ -40,39 +44,43 @@ typedef enum
     FT_END = 0xff
 } PwsFieldType;
 
+/** \brief Linked-list of record fields. */
 typedef struct PwsDbField
 {
-    struct PwsDbField *next;
-    uint8_t type;
-    char *value;
+    struct PwsDbField *next;  ///< Next field in list
+    uint8_t type;  ///< Type of field, see PwsFieldType
+    char *value;  ///< Field value, `NULL`-terminated string
 } PwsDbField;
 
+/** \brief Linked-list of database records. */
 typedef struct PwsDbRecord
 {
-    struct PwsDbRecord *next;
-    PwsDbField *fields;
+    struct PwsDbRecord *next;  ///< Next record in list
+    PwsDbField *fields;  ///< List of fields owned by the record
 } PwsDbRecord;
 
 #ifndef PWSAFE_EXTERN
 #define PWSAFE_EXTERN extern
 #endif
 
-/** Get libpwsafe version */
+/** 
+ * \brief Get libpwsafe version 
+ */
 PWSAFE_EXTERN const char *pws_get_version();
 
 /**
- * Get a specific field from a database record
+ * \brief Get a specific field from a database record
  * \returns The field value, `NULL` if the field does not exist in the record.
 */
 PWSAFE_EXTERN const char *pws_rec_get_field(const PwsDbRecord *record, PwsFieldType ft);
 
-/**
- * Free memory that has been allocated for a returned value
-*/
+/** 
+ * \brief Free memory that has been allocated for a returned value 
+ */
 PWSAFE_EXTERN void pws_free_db_records(PwsDbRecord *p);
 
 /**
- * Check if `password` unlocks the account database at `pathname`
+ * \brief Check if `password` unlocks the account database at `pathname`
  * \param [in] pathname The pathname of the account database
  * \param [in] password The database password
  * \param[out] rc Optional result code, set if operation fails.
@@ -81,7 +89,7 @@ PWSAFE_EXTERN void pws_free_db_records(PwsDbRecord *p);
 PWSAFE_EXTERN _Bool pws_db_check_password(const char *pathname, const char *password, int *rc);
 
 /**
- * Open a Password Safe database file and read the database header.
+ * \brief Open a Password Safe database file and read the database header.
  * \param [in] pathname The pathname of the account database
  * \param [in] password The database password
  * \param[out] records Linked list of records read from database
@@ -93,7 +101,13 @@ PWSAFE_EXTERN _Bool pws_db_check_password(const char *pathname, const char *pass
 PWSAFE_EXTERN _Bool pws_db_read(const char *pathname, const char *password, PwsDbRecord **records, int *rc);
 
 /**
- * Write a new Password Safe v2 database
+ * \brief Write a new Password Safe v2 database
+ *
+ * All account fields, including those not recognized, will be written.
+ * Fields for which `value` is `NULL` will be silently ignored.
+ *
+ * A field of type `FT_UUID` with a unique value will be generated 
+ * for any record that does not already contain this field.
  * \param[in] pathname The pathname of the account database
  * \param[in] password The database password
  * \param[in] records Optional account records to write to the database.
@@ -102,9 +116,6 @@ PWSAFE_EXTERN _Bool pws_db_read(const char *pathname, const char *password, PwsD
  * \returns `true` if operation succeeded, `false` otherwise
  * \note
  * If the file `pathname` already exists, it will be overwritten.
- * \note
- * All account fields, including those not recognized, will be written.
- * Fields for which `value` is `NULL` will be silently ignored.
  * \note
  * It is not necessary to terminate the fields of a record with
  * a field of type `FT_END`. If a field of type `FT_END` is present
@@ -118,9 +129,6 @@ PWSAFE_EXTERN _Bool pws_db_read(const char *pathname, const char *password, PwsD
  * If any record has a field of type `FT_UUID` with a value that is not of 
  * form `0123456789ABCDEF0123456789ABCDEF`, the function will return `false`
  * and `rc` will be set to `PWS_ERR_INVALID_ARG`.
- * 
- * A field of type `FT_UUID` with a unique value will be generated 
- * for any record that does not already contain this field.
  * \note
  * The "default user character" from Password Safe 1.x 
  * is not respected in the FT_NAME field.
