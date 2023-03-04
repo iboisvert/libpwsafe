@@ -7,4 +7,6 @@ if(DOXYGEN_FOUND)
     set(DOXYGEN_SEARCHENGINE "NO")
 
     doxygen_add_docs(docs pwsafe.h ALL)
+
+    install(DIRECTORY ${CMAKE_BINARY_DIR}/api/html/ DESTINATION usr/share/doc/libpwsafe COMPONENT dev)
 endif()
