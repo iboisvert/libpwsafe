@@ -1,11 +1,13 @@
 # libpwsafe
-Library for reading and writing Passwordsafe account database files
+Library for reading and writing Password Safe-compatible
+encrypted account password database files.
 
-# Attributions
-This software makes use of code written by Nicolas S. Dade <nic.dade@gmail.com>.
-See his [pwsafe GitHub repo](https://github.com/nsd20463/pwsafe)
+## Attributions
+This project uses work from the [pwsafe project](https://github.com/nsd20463/pwsafe) by Nicolas S. Dade
+and the [pwsafe project](https://github.com/pwsafe/pwsafe) by Rony Shapiro. Thank you to both 
+and the other contributors to the projects.
 
-# Copyright
+## Copyright
 Copyright (C) 2023 Ian Boisvert
 
 This program is free software: you can redistribute it and/or modify
