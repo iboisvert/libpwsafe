@@ -14,6 +14,7 @@ target_link_libraries(
     pwsafe
     GTest::gtest_main
 )
+target_include_directories(libpwsafe-test INTERFACE ..)
 add_dependencies(libpwsafe-test pwsafeStatic)
 
 include(GoogleTest)

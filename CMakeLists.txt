@@ -12,6 +12,8 @@ set(CMAKE_CXX_STANDARD 17)
 
 option(PWSAFE_BUILD_DOCS "Build documentation (needs Doxygen)" ON)
 option(PWSAFE_BUILD_TESTS "Build test executables" ON)
+option(PWSAFE_BUILD_SHARED "Build shared library" ON)
+option(PWSAFE_BUILD_STATIC "Build static library" ON)
 
 include(CheckIncludeFiles)
 include(CheckFunctionExists)
@@ -51,7 +53,7 @@ if(PWSAFE_BUILD_TESTS)
 endif()
 
 set(CPACK_VERBATIM_VARIABLES YES)
-set(CPACK_COMPONENTS_ALL "dev;runtime;docs")
+set(CPACK_COMPONENTS_ALL "dev;runtime")
 set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
 
 set(CPACK_SOURCE_GENERATOR "TGZ")
