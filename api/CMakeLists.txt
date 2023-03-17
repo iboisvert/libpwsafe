@@ -1,3 +1,6 @@
+add_library(pwsafe_api INTERFACE)
+target_include_directories(pwsafe_api INTERFACE ${CMAKE_CURRENT_LIST_DIR})
+
 install(FILES pwsafe.h DESTINATION include/libpwsafe COMPONENT dev)
 
 if(DOXYGEN_FOUND)
