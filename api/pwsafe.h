@@ -5,7 +5,6 @@
 #define HAVE_PWSAFE_H
 
 #include <stdio.h>
-#include <stdbool.h>
 #include <stdint.h>
 
 #ifdef  __cplusplus
@@ -86,7 +85,7 @@ PWSAFE_EXTERN void pws_free_db_records(PwsDbRecord *p);
  * \param[out] rc Optional result code, set if operation fails.
  * \returns `true` if password is correct, `false` otherwise.
  */
-PWSAFE_EXTERN _Bool pws_db_check_password(const char *pathname, const char *password, int *rc);
+PWSAFE_EXTERN int pws_db_check_password(const char *pathname, const char *password, int *rc);
 
 /**
  * \brief Open a Password Safe database file and read the database header.
@@ -98,7 +97,7 @@ PWSAFE_EXTERN _Bool pws_db_check_password(const char *pathname, const char *pass
  * \note
  * Fields of type `FT_UUID` have form `0123456789ABCDEF0123456789ABCDEF`
  */
-PWSAFE_EXTERN _Bool pws_db_read(const char *pathname, const char *password, PwsDbRecord **records, int *rc);
+PWSAFE_EXTERN int pws_db_read(const char *pathname, const char *password, PwsDbRecord **records, int *rc);
 
 /**
  * \brief Write a new Password Safe v2 database
@@ -133,7 +132,7 @@ PWSAFE_EXTERN _Bool pws_db_read(const char *pathname, const char *password, PwsD
  * The "default user character" from Password Safe 1.x 
  * is not respected in the FT_NAME field.
  */
-PWSAFE_EXTERN _Bool pws_db_write(const char *pathname,
+PWSAFE_EXTERN int pws_db_write(const char *pathname,
     const char *password, PwsDbRecord *records, int *rc);
 
 #ifdef  __cplusplus

@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include <ctype.h>
 #include <unistd.h>
 #ifdef HAVE_SYS_RANDOM_H
@@ -819,7 +820,7 @@ PWSAFE_EXTERN void pws_free_db_records(PwsDbRecord *p)
  * \param[out] rc Optional result code, set if operation fails.
  * \returns `true` if password is correct, `false` otherwise.
  */
-PWSAFE_EXTERN _Bool pws_db_check_password(const char *pathname, const char *password, int *rc)
+PWSAFE_EXTERN int pws_db_check_password(const char *pathname, const char *password, int *rc)
 {
     if (!check_invalid_args(pathname && password, rc))
         return false;
@@ -931,7 +932,7 @@ static _Bool db_ensure_record_has_uuid(PwsDbRecord *rec, PwsDbRecord *records, c
     return false;
 }
 
-_Bool pws_db_read(const char *pathname, const char *password, PwsDbRecord **records, int *rc)
+PWSAFE_EXTERN int pws_db_read(const char *pathname, const char *password, PwsDbRecord **records, int *rc)
 {
     if (!check_invalid_args(pathname && password && records, rc))
         return false;
@@ -945,7 +946,7 @@ _Bool pws_db_read(const char *pathname, const char *password, PwsDbRecord **reco
     if (!f)
     {
         set_rc(rc, PRC_ERR_OPEN);
-        return NULL;
+        return false;
     }
 
     Header header;
@@ -973,7 +974,7 @@ done:
     return status;
 }
 
-_Bool pws_db_write(const char *pathname,
+PWSAFE_EXTERN int pws_db_write(const char *pathname,
     const char *password, PwsDbRecord *records, int *rc)
 {
     if (!check_invalid_args(pathname && password, rc))
