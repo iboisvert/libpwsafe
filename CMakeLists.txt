@@ -4,16 +4,16 @@ project(libpwsafe
     DESCRIPTION "Library for reading and writing Password Safe account database files" 
     HOMEPAGE_URL "https://github.com/iboisvert/libpwsafe"
 )
-
 set (LIBPWSAFE_VERSION "${CMAKE_PROJECT_VERSION}")
-
-set(CMAKE_C_STANDARD 17)
-set(CMAKE_CXX_STANDARD 17)
 
 option(LIBPWSAFE_BUILD_DOCS "Build documentation (needs Doxygen)" ON)
 option(LIBPWSAFE_BUILD_TESTS "Build test executables" ON)
 option(LIBPWSAFE_BUILD_SHARED "Build shared library" ON)
 option(LIBPWSAFE_BUILD_STATIC "Build static library" ON)
+
+set(CMAKE_C_STANDARD 17)
+set(CMAKE_CXX_STANDARD 17)
+set(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CPackDescription.txt")
 
 include(CheckIncludeFiles)
 include(CheckFunctionExists)
