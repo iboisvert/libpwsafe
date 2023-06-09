@@ -9,12 +9,16 @@ list(APPEND SRC
 add_library(objlib OBJECT ${SRC})
 
 if(LIBPWSAFE_BUILD_STATIC)
-    add_library(pwsafeStatic $<TARGET_OBJECTS:objlib>)
+    add_library(pwsafeStatic STATIC $<TARGET_OBJECTS:objlib>)
     target_link_libraries(pwsafeStatic PUBLIC pwsafe_api INTERFACE nettle)
 
     # On Windows, static lib is libpwsafe.lib, DLL is pwsafe.dll/.lib
     # On Linux, static lib is libpwsafe.a, SO is libpwsafe.so
-    set_target_properties(pwsafeStatic PROPERTIES OUTPUT_NAME $<IF:$<BOOL:${WIN32}>,libpwsafe,pwsafe>)
+    set_target_properties(pwsafeStatic 
+        PROPERTIES 
+        VERSION ${LIBPWSAFE_VERSION}
+        OUTPUT_NAME $<IF:$<BOOL:${WIN32}>,libpwsafe,pwsafe>
+        ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
 
     install(TARGETS pwsafeStatic ARCHIVE COMPONENT dev)
 endif()
@@ -23,6 +27,11 @@ if(LIBPWSAFE_BUILD_SHARED)
     add_library(pwsafe SHARED $<TARGET_OBJECTS:objlib>)
     target_link_libraries(pwsafe PUBLIC pwsafe_api nettle)
 
+    set_target_properties(pwsafe 
+        PROPERTIES 
+        VERSION ${LIBPWSAFE_VERSION}
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+    
     install(TARGETS pwsafe LIBRARY COMPONENT dev)
     install(TARGETS pwsafe LIBRARY COMPONENT runtime)
 endif()
