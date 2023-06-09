@@ -1,0 +1,8 @@
+FROM fedora:38
+RUN dnf makecache \
+    && dnf install -y git rpm-build cmake gcc gcc-c++ libasan libubsan nettle-devel gtest-devel \
+    && dnf clean -y all \
+    && groupadd --gid 1000 vscode \
+    && useradd --uid 1000 --gid 1000 -G wheel -s /bin/bash -m vscode \
+    && sh -c "echo \"%wheel ALL=(ALL) NOPASSWD: ALL\" > /etc/sudoers.d/10-wheel"
+USER 1000
