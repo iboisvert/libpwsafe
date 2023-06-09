@@ -18,7 +18,7 @@ option(LIBPWSAFE_BUILD_STATIC "Build static library" ON)
 include(CheckIncludeFiles)
 include(CheckFunctionExists)
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 if(LIBPWSAFE_BUILD_DOCS)
     find_package(Doxygen)
