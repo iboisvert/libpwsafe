@@ -1,4 +1,3 @@
-find_package(Nettle REQUIRED)
 include_directories(${NETTLE_INCLUDE_DIR})
 
 list(APPEND SRC
@@ -36,6 +35,8 @@ if(LIBPWSAFE_BUILD_SHARED)
     install(TARGETS pwsafe LIBRARY COMPONENT runtime)
 endif()
 
-set(CPACK_DEB_COMPONENT_INSTALL ON PARENT_SCOPE)
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.35-0ubuntu3.1), libnettle8 (>= 3.7.3-1build2)" PARENT_SCOPE)
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Ian Boisvert" PARENT_SCOPE)
+
+set(CPACK_RPM_PACKAGE_LICENSE "GPL-3.0-only" PARENT_SCOPE)
+set(CPACK_RPM_PACKAGE_REQUIRES "glibc >= 2.36, nettle >= 3.8" PARENT_SCOPE)
