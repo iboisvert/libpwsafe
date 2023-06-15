@@ -22,7 +22,7 @@ include(CheckFunctionExists)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 if(LIBPWSAFE_BUILD_DOCS)
-    find_package(Doxygen)
+    find_package(Doxygen REQUIRED)
 endif()
 if(LIBPWSAFE_BUILD_TESTS)
     find_package(GTest REQUIRED)
