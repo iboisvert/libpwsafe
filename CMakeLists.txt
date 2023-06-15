@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 project(libpwsafe 
-    VERSION 0.1.0 
+    VERSION 0.1 
     DESCRIPTION "Library for reading and writing Password Safe account database files" 
     HOMEPAGE_URL "https://github.com/iboisvert/libpwsafe"
 )
