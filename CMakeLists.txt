@@ -14,6 +14,7 @@ option(LIBPWSAFE_BUILD_STATIC "Build static library" ON)
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_CXX_STANDARD 17)
 set(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/cmake/CPackDescription.txt")
+set(CPACK_PACKAGE_VENDOR "Ian Boisvert")
 
 include(CheckIncludeFiles)
 include(CheckFunctionExists)
