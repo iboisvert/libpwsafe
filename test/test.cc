@@ -143,6 +143,21 @@ TEST(Test, OpenEmptyDbV2WithIncorrectPasswordFails)
     EXPECT_EQ(PRC_ERR_INCORRECT_PW, rc);
 }
 
+TEST(Test, OpenDbV1Succeeds)
+{
+    int rc = 0;
+
+    PwsDb pdb;
+    ASSERT_EQ(true, db_open("data/test-v1.dat", "password", &pdb, &rc));
+    PwsDbRecord *records = NULL;
+    ASSERT_EQ(true, db_read_accounts(&pdb, &records, &rc));
+
+    fclose(pdb.db_file);
+    pws_free_db_records(records);
+
+    ASSERT_EQ(PWSAFE_DB_V1, pdb.db_vers);
+}
+
 TEST(Test, ReadDbV1Succeeds)
 {
     int rc = -1;
@@ -177,6 +192,21 @@ TEST(Test, ReadDbV1Succeeds)
     EXPECT_STREQ("", pws_rec_get_field(rec, FT_NOTES));
 
     pws_free_db_records(records);
+}
+
+TEST(Test, OpenDbV2Succeeds)
+{
+    int rc = 0;
+
+    PwsDb pdb;
+    ASSERT_EQ(true, db_open("data/test-v2.dat", "password", &pdb, &rc));
+    PwsDbRecord *records = NULL;
+    ASSERT_EQ(true, db_read_accounts(&pdb, &records, &rc));
+
+    fclose(pdb.db_file);
+    pws_free_db_records(records);
+
+    ASSERT_EQ(PWSAFE_DB_V2, pdb.db_vers);
 }
 
 TEST(Test, ReadDbV2Succeeds)

@@ -846,16 +846,35 @@ PWSAFE_EXTERN int pws_db_check_password(const char *pathname, const char *passwo
     return status;
 }
 
-static _Bool db_read_accounts(PwsDb *pdb, PwsDbRecord **records, int *rc)
+_Bool db_read_accounts(PwsDb *pdb, PwsDbRecord **records, int *rc)
 {
     int local_rc = PRC_SUCCESS;
     *records = NULL;
 
     PwsDbRecord *phead = NULL, *p = NULL;
 
-    // Use a while loop because if we read the V2 magic record
-    // we want to skip that and read the next record
-    while (db_read_next_record(pdb, &p, &local_rc))
+    // Read the first record to check for the V2 magic
+    bool status = db_read_next_record(pdb, &p, &local_rc);
+    if (status)
+    {
+        const char *ptitle = rec_get_title(p);
+        if (ptitle != NULL)
+        {
+            if (strcmp(PWSAFE_V2_NAME_MAGIC, ptitle) == 0)
+            {
+                // V2 database, free the record and read the next
+                free_record(p);
+                pdb->db_vers = PWSAFE_DB_V2;
+                status = db_read_next_record(pdb, &p, &local_rc);
+            }
+            else
+            {
+                pdb->db_vers = PWSAFE_DB_V1;
+            }
+        }
+    }
+
+    while (status)
     {
         const char *ptitle = rec_get_title(p);
         if (ptitle == NULL)
@@ -865,25 +884,11 @@ static _Bool db_read_accounts(PwsDb *pdb, PwsDbRecord **records, int *rc)
             free(p);
             return false;
         }
-        if (strcmp(PWSAFE_V2_NAME_MAGIC, ptitle) == 0)
-        {
-            free_record(p);
-            pdb->db_vers = PWSAFE_DB_V2;
-            continue;
-        }
-        else
-        {
-            pdb->db_vers = PWSAFE_DB_V1;
-        }
 
+        p->next = phead;
         phead = p;
-        while (db_read_next_record(pdb, &p, &local_rc))
-        {
-            p->next = phead;
-            phead = p;
-        };
 
-        break;
+        status = db_read_next_record(pdb, &p, &local_rc);
     }
 
     *records = phead;
@@ -932,15 +937,9 @@ static _Bool db_ensure_record_has_uuid(PwsDbRecord *rec, PwsDbRecord *records, c
     return false;
 }
 
-PWSAFE_EXTERN int pws_db_read(const char *pathname, const char *password, PwsDbRecord **records, int *rc)
+_Bool db_open(const char *pathname, const char *password, struct PwsDb *pdb, int *rc)
 {
-    if (!check_invalid_args(pathname && password && records, rc))
-        return false;
-
-    *records = NULL;
-
     int local_rc = PRC_SUCCESS;
-    eval_sys_byte_order();
 
     FILE *f = fopen(pathname, "rb");
     if (!f)
@@ -959,17 +958,37 @@ PWSAFE_EXTERN int pws_db_read(const char *pathname, const char *password, PwsDbR
         goto done;
     }
 
+    init_pdb(pdb);
+    pdb->db_file = f;
+    memcpy(&pdb->db_header, &header, sizeof(pdb->db_header));
 
-    PwsDb pdb;
-    init_pdb(&pdb);
-    pdb.db_file = f;
-    memcpy(&pdb.db_header, &header, sizeof(pdb.db_header));
-
-    db_compute_key(&pdb, password);
-
-    status = db_read_accounts(&pdb, records, &local_rc);
+    db_compute_key(pdb, password);
 
 done:
+    set_rc(rc, local_rc);
+    return status;
+}
+
+PWSAFE_EXTERN int pws_db_read(const char *pathname, const char *password, PwsDbRecord **records, int *rc)
+{
+    if (!check_invalid_args(pathname && password && records, rc))
+        return false;
+
+    eval_sys_byte_order();
+
+    int local_rc = PRC_SUCCESS;
+    _Bool status;
+
+    PwsDb pdb;
+    status = db_open(pathname, password, &pdb, &local_rc);
+    if (status)
+    {
+    status = db_read_accounts(&pdb, records, &local_rc);
+
+        fclose(pdb.db_file);
+        pdb.db_file = NULL;
+    }
+
     set_rc(rc, local_rc);
     return status;
 }
