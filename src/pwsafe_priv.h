@@ -75,6 +75,9 @@ void uuid_bin_to_hex(const uint8_t *uuid, char *suuid);
 /** Convert 32-byte hex string to 16-byte binary UUID. `suuid` and `uuid` must not be equal. */
 _Bool uuid_hex_to_bin(const char *suuid, uint8_t *uuid);
 
+/** Allocate db record */
+struct PwsDbRecord *alloc_record();
+
 /** Open a database */
 _Bool db_open(const char *pathname, const char *password, struct PwsDb *pdb, int *rc);
 

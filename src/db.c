@@ -22,8 +22,9 @@ static const char * const PWSAFE_V2_NAME_MAGIC =
     " !!!Version 2 File Format!!! Please upgrade to PasswordSafe 2.0 or later";
 static const char * const PWSAFE_V2_PASSWORD_MAGIC = "2.0";
 
+static const int MAX_RECORD_COUNT = 1000000;  // For sanity checks
+
 // Forward decls
-static PwsDbRecord *alloc_record();
 static PwsDbField *alloc_field(uint8_t type, char *value);
 static void free_fields(PwsDbField *p);
 
@@ -44,7 +45,7 @@ static void init_pdb(PwsDb *pdb)
     memset_func(&pdb->db_header, 0, sizeof(Header));
 }
 
-static PwsDbRecord *alloc_record()
+PwsDbRecord *alloc_record()
 {
     PwsDbRecord *p = malloc(sizeof(PwsDbRecord));
     if (p)
@@ -801,6 +802,19 @@ static _Bool check_invalid_uuid(PwsDbRecord *prec, int *rc)
         prec = prec->next;
     }
     return true;
+}
+
+PWSAFE_EXTERN int pws_db_record_count(PwsDbRecord * const records)
+{
+    int count = 0;
+    PwsDbRecord *record = records;
+    while (record && count < MAX_RECORD_COUNT)
+    {
+        ++count;
+        record = record->next;
+    }
+    if (count == MAX_RECORD_COUNT) count = -1;
+    return count;
 }
 
 PWSAFE_EXTERN void pws_free_db_records(PwsDbRecord *p)

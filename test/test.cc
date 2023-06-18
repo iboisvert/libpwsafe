@@ -317,3 +317,23 @@ TEST(Test, WriteRecordWithUuidSucceeds)
 
     pws_free_db_records(records);
 }
+
+TEST(Test, TestCountRecordsSucceeds)
+{
+    PwsDbRecord *head = alloc_record();
+    head->next = alloc_record();
+    head->next->next = alloc_record();
+    ASSERT_EQ(3, pws_db_record_count(head));
+    pws_free_db_records(head);
+}
+
+TEST(Test, TestCountRecordsFails)
+{
+    PwsDbRecord *head = alloc_record();
+    head->next = alloc_record();
+    head->next->next = alloc_record();
+    head->next->next->next = head;
+    ASSERT_EQ(-1, pws_db_record_count(head));
+    head->next->next->next = NULL;
+    pws_free_db_records(head);
+}
