@@ -100,6 +100,12 @@ PWSAFE_EXTERN int pws_db_check_password(const char *pathname, const char *passwo
 PWSAFE_EXTERN int pws_db_read(const char *pathname, const char *password, PwsDbRecord **records, int *rc);
 
 /**
+ * \brief Return number of records in linked list
+ * \returns < 0 if error occurred (e.g. circular linked list)
+ */
+PWSAFE_EXTERN int pws_db_record_count(PwsDbRecord * const records);
+
+/**
  * \brief Write a new Password Safe v2 database
  *
  * All account fields, including those not recognized, will be written.
