@@ -58,6 +58,8 @@ typedef struct PwsDb
     Block cbc;  // Always little-endian
 } PwsDb;
 
+struct PwsDbRecord;
+
 /** Swap block byte order le--be */
 void swap_byte_order(Block b);
 /** Make a block composed of two little-endian unsigned ints */
@@ -73,14 +75,21 @@ void uuid_bin_to_hex(const uint8_t *uuid, char *suuid);
 /** Convert 32-byte hex string to 16-byte binary UUID. `suuid` and `uuid` must not be equal. */
 _Bool uuid_hex_to_bin(const char *suuid, uint8_t *uuid);
 
-/**
- * Initialize a new database header
- */
+/** Open a database */
+_Bool db_open(const char *pathname, const char *password, struct PwsDb *pdb, int *rc);
+
+/** Read accounts from a database, call after db_open() */
+_Bool db_read_accounts(PwsDb *pdb, struct PwsDbRecord **records, int *rc);
+
+/** Initialize a new database header */
 extern _Bool db_init_header(struct Header *h, const char *pw, int *rc);
+
 extern _Bool db_check_password(struct Header *h, const char *pw, int *rc);
+
 extern void db_encode_block(struct PwsDb *pdb, Block block);
 extern void db_decode_block(struct PwsDb *pdb, Block block);
 
+// Helpers
 extern const char *trim_right(const char *pbegin, char *pend);
 extern _Bool is_ws(const char c);
 
