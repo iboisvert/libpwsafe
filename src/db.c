@@ -822,6 +822,7 @@ PWSAFE_EXTERN void pws_free_db_records(PwsDbRecord *p)
     while (p != NULL)
     {
         PwsDbRecord *pnext = p->next;
+        p->next = NULL;
         free_record(p);
         p = pnext;
     }
