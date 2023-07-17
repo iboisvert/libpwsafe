@@ -68,15 +68,45 @@ typedef struct PwsDbRecord
 PWSAFE_EXTERN const char *pws_get_version();
 
 /**
- * \brief Get a specific field from a database record
+ * \brief Allocate a new empty account record.
+ * 
+ * This function behaves exactly the same as calling
+ * `pws_add_record(NULL)`
+ * \note
+ * Caller must call `pws_free_db_records()` to release memory.
+ */
+PWSAFE_EXTERN PwsDbRecord *pws_new_record();
+
+/**
+ * \brief Allocate a new empty account record and
+ *        insert it at the head of the linked list of account records
+ * \param[in] head Pointer to the head of the linked list of account records. Optional.
+ * \returns Pointer to the head of the linked list of account records
+ * \note
+ * Caller must call `pws_free_db_records()` to release memory.
+ */
+PWSAFE_EXTERN PwsDbRecord *pws_add_record(PwsDbRecord *records);
+
+/**
+ * \brief Allocate a new field and add it to the account record
+ * \returns Pointer to the allocated field, 
+ *          or `NULL` if `records` is NULL, `field_type` is invalid, or `value` is `NULL`.
+ * \note
+ * Caller must call `pws_free_db_records()` to release memory.
+ */
+PWSAFE_EXTERN PwsDbField *pws_add_field(PwsDbRecord *record, PwsFieldType field_type, const char *value);
+
+/**
+ * \brief Get a specific field from an account database record
  * \returns The field value, `NULL` if the field does not exist in the record.
 */
-PWSAFE_EXTERN const char *pws_rec_get_field(const PwsDbRecord *record, PwsFieldType ft);
+PWSAFE_EXTERN const char *pws_rec_get_field(const PwsDbRecord *record, PwsFieldType field_type);
 
 /** 
- * \brief Free memory that has been allocated for a returned value 
+ * \brief Free memory that has been allocated for a returned value
+ * \param[in] records Pointer to the head of the linked list of account records
  */
-PWSAFE_EXTERN void pws_free_db_records(PwsDbRecord *p);
+PWSAFE_EXTERN void pws_free_db_records(PwsDbRecord *records);
 
 /**
  * \brief Check if `password` unlocks the account database at `pathname`
@@ -103,7 +133,7 @@ PWSAFE_EXTERN int pws_db_read(const char *pathname, const char *password, PwsDbR
  * \brief Return number of records in linked list
  * \returns < 0 if error occurred (e.g. circular linked list)
  */
-PWSAFE_EXTERN int pws_db_record_count(PwsDbRecord * const records);
+PWSAFE_EXTERN int pws_db_record_count(const PwsDbRecord *records);
 
 /**
  * \brief Write a new Password Safe v2 database
