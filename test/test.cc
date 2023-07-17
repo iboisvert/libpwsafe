@@ -337,3 +337,54 @@ TEST(Test, TestCountRecordsFails)
     head->next->next->next = NULL;
     pws_free_db_records(head);
 }
+
+TEST(Test, TestAllocateRecordSucceeds)
+{
+    PwsDbRecord *prec1 = pws_new_record();
+    ASSERT_EQ(nullptr, prec1->next);
+    ASSERT_EQ(nullptr, prec1->fields);
+    pws_free_db_records(prec1);
+    prec1 = nullptr;
+
+    PwsDbRecord *prec2 = pws_add_record(nullptr);
+    ASSERT_EQ(nullptr, prec2->next);
+    ASSERT_EQ(nullptr, prec2->fields);
+
+    PwsDbRecord *prec3 = pws_add_record(prec2);
+    ASSERT_EQ(nullptr, prec2->next);
+    ASSERT_NE(nullptr, prec3->next);
+
+    pws_free_db_records(prec3);
+}
+
+TEST(Test, TestAllocateFieldFails)
+{
+    PwsDbField *pfield;
+
+    pfield = pws_add_field(nullptr, FT_GROUP, "value");
+    ASSERT_EQ(nullptr, pfield);
+
+    PwsDbRecord *prec = pws_new_record();
+
+    pfield = pws_add_field(prec, (PwsFieldType)FT_END, "value");
+    ASSERT_EQ(nullptr, pfield);
+
+    pfield = pws_add_field(prec, (PwsFieldType)(FT_END+1), "value");
+    ASSERT_EQ(nullptr, pfield);
+
+    pfield = pws_add_field(prec, FT_GROUP, nullptr);
+    ASSERT_EQ(nullptr, pfield);
+
+    pws_free_db_records(prec);
+}
+
+TEST(Test, TestAllocateFieldSucceeds)
+{
+    PwsDbRecord *prec = pws_new_record();
+    PwsDbField *pfield;
+
+    pfield = pws_add_field(prec, FT_GROUP, "value");
+    ASSERT_NE(nullptr, pfield);
+
+    pws_free_db_records(prec);
+}

@@ -804,10 +804,10 @@ static _Bool check_invalid_uuid(PwsDbRecord *prec, int *rc)
     return true;
 }
 
-PWSAFE_EXTERN int pws_db_record_count(PwsDbRecord * const records)
+PWSAFE_EXTERN int pws_db_record_count(const PwsDbRecord *records)
 {
     int count = 0;
-    PwsDbRecord *record = records;
+    const PwsDbRecord *record = records;
     while (record && count < MAX_RECORD_COUNT)
     {
         ++count;
@@ -817,14 +817,58 @@ PWSAFE_EXTERN int pws_db_record_count(PwsDbRecord * const records)
     return count;
 }
 
-PWSAFE_EXTERN void pws_free_db_records(PwsDbRecord *p)
+PWSAFE_EXTERN PwsDbRecord *pws_new_record()
 {
-    while (p != NULL)
+    return alloc_record();
+}
+
+PWSAFE_EXTERN PwsDbRecord *pws_add_record(PwsDbRecord *records)
+{
+    PwsDbRecord *prec = alloc_record();
+    if (prec != NULL)
     {
-        PwsDbRecord *pnext = p->next;
-        p->next = NULL;
-        free_record(p);
-        p = pnext;
+        prec->next = records;
+    }
+    return prec;
+}
+
+PWSAFE_EXTERN PwsDbField *pws_add_field(PwsDbRecord *record, PwsFieldType field_type, const char *value)
+{
+    if (record == NULL || field_type >= FT_END || value == NULL)
+    {
+        return NULL;
+    }
+
+    PwsDbField *pfield = NULL;
+
+    char *pval = strdup(value);
+    if (pval != NULL)
+    {
+        pfield = alloc_field(field_type, pval);
+        if (pfield != NULL)
+        {
+            pfield->next = record->fields;
+            record->fields = pfield;
+        }
+        else
+        {
+            free(pval);
+            pval = NULL;
+        }
+    }
+    return pfield;
+}
+
+PWSAFE_EXTERN void pws_free_db_records(PwsDbRecord *records)
+{
+    while (records != NULL)
+    {
+        // IMB 2023-06-18 It would be possible to double-free if somehow
+        //   linked list becomes circular but at least loop won't be infinite
+        PwsDbRecord *pnext = records->next;
+        records->next = NULL;
+        free_record(records);
+        records = pnext;
     }
 }
 
