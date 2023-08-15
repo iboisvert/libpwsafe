@@ -10,6 +10,7 @@ option(LIBPWSAFE_BUILD_DOCS "Build documentation (needs Doxygen)" ON)
 option(LIBPWSAFE_BUILD_TESTS "Build test executables" ON)
 option(LIBPWSAFE_BUILD_SHARED "Build shared library" ON)
 option(LIBPWSAFE_BUILD_STATIC "Build static library" ON)
+option(LIBPWSAFE_DEBUG_SANITIZE "Enable AddressSantizer and UBSan, requires full recompile" OFF)
 
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_CXX_STANDARD 17)
@@ -39,10 +40,11 @@ add_compile_definitions(
 )
 add_compile_options(
     -fPIC -Wall -Wextra
-    "$<$<CONFIG:DEBUG>:-ggdb;-O0;-fsanitize=address,undefined;-fno-omit-frame-pointer>"
+    "$<$<CONFIG:DEBUG>:-ggdb;-O0;-fno-omit-frame-pointer>"
+    "$<$<AND:$<CONFIG:DEBUG>,$<BOOL:${LIBPWSAFE_DEBUG_SANITIZE}>>:-fsanitize=address,undefined>"
 )
 add_link_options(
-    "$<$<CONFIG:DEBUG>:-fsanitize=address,undefined>"
+    "$<$<AND:$<CONFIG:DEBUG>,$<BOOL:${LIBPWSAFE_DEBUG_SANITIZE}>>:-fsanitize=address,undefined>"
 )
 
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
