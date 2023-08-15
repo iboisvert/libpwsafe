@@ -1,7 +1,10 @@
 add_library(pwsafe_api INTERFACE)
 target_include_directories(pwsafe_api INTERFACE ${CMAKE_CURRENT_LIST_DIR})
 
-install(FILES pwsafe.h DESTINATION include/libpwsafe COMPONENT dev)
+# IMB 2023-05-14 Replace install(FILES) with install(PUBLIC_HEADER)
+if(CMAKE_PROJECT_NAME STREQUAL "libpwsafe")
+    install(FILES pwsafe.h DESTINATION include/libpwsafe COMPONENT dev)
+endif()
 
 if(DOXYGEN_FOUND)
     set(DOXYGEN_OPTIMIZE_OUTPUT_FOR_C "YES")
@@ -11,5 +14,7 @@ if(DOXYGEN_FOUND)
 
     doxygen_add_docs(docs pwsafe.h ALL)
 
-    install(DIRECTORY ${CMAKE_BINARY_DIR}/api/html/ DESTINATION usr/share/doc/libpwsafe COMPONENT dev)
+    if(CMAKE_PROJECT_NAME STREQUAL "libpwsafe")
+        install(DIRECTORY ${CMAKE_BINARY_DIR}/api/html/ DESTINATION usr/share/doc/libpwsafe COMPONENT dev)
+    endif()
 endif()
