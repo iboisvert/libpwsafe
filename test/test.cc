@@ -23,7 +23,7 @@ TEST(Test, UuidBinToHex)
     uint8_t uuid[16] = {0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef};
     char suuid[33] = "0";
     suuid[32] = 0;
-    uuid_bin_to_hex(uuid, suuid);
+    uuid_bin_to_hex(uuid, suuid, 16);
     EXPECT_STREQ("0123456789ABCDEF0123456789ABCDEF", suuid);
 }
 
@@ -31,7 +31,7 @@ TEST(Test, UuidHexToBin)
 {
     char suuid[] = "0123456789abcdef0123456789abcdef";
     uint8_t uuid[16] = {0};
-    uuid_hex_to_bin(suuid, uuid);
+    uuid_hex_to_bin(suuid, uuid, 16);
     EXPECT_EQ(0, memcmp("\x01\x23\x45\x67\x89\xab\xcd\xef\x01\x23\x45\x67\x89\xab\xcd\xef", uuid, 16));
 }
 

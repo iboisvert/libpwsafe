@@ -78,6 +78,14 @@ PWSAFE_EXTERN const char *pws_get_version();
 PWSAFE_EXTERN PwsDbRecord *pws_new_record();
 
 /**
+ * Generate a UUID for an account record.
+ * \param[out] uuid An array of at least 33 characters into which is copied 
+ *   the UUID as a hex string of 32 character. The string is `NULL`-terminated. 
+ * \returns `PRC_ERR_FAIL` if an error occurred generating UUID, otherwise `PRC_SUCCESS`.
+*/
+PWSAFE_EXTERN int pws_generate_uuid(char uuid[33]);
+
+/**
  * \brief Allocate a new empty account record and
  *        insert it at the head of the linked list of account records
  * \param[in] head Pointer to the head of the linked list of account records. Optional.
