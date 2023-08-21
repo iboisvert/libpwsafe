@@ -70,10 +70,18 @@ void block_le_to_sys(Block b);
 void zero_block(Block block);
 
 // UUID conversion
-/** Convert 16-byte binary UUID to 32-byte hex string. Can convert in-place. */
-void uuid_bin_to_hex(const uint8_t *uuid, char *suuid);
-/** Convert 32-byte hex string to 16-byte binary UUID. `suuid` and `uuid` must not be equal. */
-_Bool uuid_hex_to_bin(const char *suuid, uint8_t *uuid);
+/** 
+ * Convert 16-byte binary UUID to 32-byte hex string. Can convert in-place. 
+ * \param uuid_len length of the uuid argument. 
+ *   The array pointed to by `suuid` must be at least twice as long as `uuid_len`
+ */
+void uuid_bin_to_hex(const uint8_t *uuid, char *suuid, size_t uuid_len);
+/** 
+ * Convert 32-byte hex string to 16-byte binary UUID. The pointers `suuid` and `uuid` must not be equal. 
+ * \param uuid_len length of the uuid argument. 
+ *   The array pointed to by `suuid` must be at least twice as long as `uuid_len`
+ */
+_Bool uuid_hex_to_bin(const char *suuid, uint8_t *uuid, size_t uuid_len);
 
 /** Allocate db record */
 struct PwsDbRecord *alloc_record();

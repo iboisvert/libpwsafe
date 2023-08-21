@@ -81,9 +81,10 @@ const char *get_default_user()
 // Used when converting to hex
 static const char HEX_DIGIT[] = "0123456789ABCDEF";
 
-void uuid_bin_to_hex(const uint8_t *uuid, char *suuid)
+void uuid_bin_to_hex(const uint8_t *uuid, char *suuid, size_t uuid_len)
 {
-    for (size_t i = 16; i-- != 0; )
+    assert(uuid_len%2 == 0);
+    for (size_t i = uuid_len; i-- != 0; )
     {
         unsigned char c = uuid[i];
         suuid[i*2] = HEX_DIGIT[c>>4];
@@ -91,11 +92,12 @@ void uuid_bin_to_hex(const uint8_t *uuid, char *suuid)
     }
 }
 
-_Bool uuid_hex_to_bin(const char *suuid, uint8_t *uuid)
+_Bool uuid_hex_to_bin(const char *suuid, uint8_t *uuid, size_t uuid_len)
 {
+    assert(uuid_len%2 == 0);
     errno = 0;
     char byte[3] = {0, 0, 0};
-    for (size_t i = 0; i < 16; ++i)
+    for (size_t i = 0; i < uuid_len; ++i)
     {
         byte[0] = suuid[2*i];
         byte[1] = suuid[2*i+1];

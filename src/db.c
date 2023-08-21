@@ -384,16 +384,17 @@ static _Bool db_read_next_field(PwsDb *pdb, PwsDbField **field, int *rc)
     // convert to text for convenience
     if (type == FT_UUID)
     {
-        char *uuid = realloc(str, 33);
+        const size_t uuid_len = 32;
+        char *uuid = realloc(str, uuid_len+1);
         if (!uuid)
         {
             free(str);
             set_rc(rc, PRC_ERR_ALLOC);
             return false;
         }
-        uuid_bin_to_hex((unsigned char *)uuid, uuid);
+        uuid_bin_to_hex((unsigned char *)uuid, uuid, uuid_len/2);
         str = uuid;
-        str[32] = 0;
+        str[uuid_len] = 0;
     }
 
     *field = alloc_field(type, str);
@@ -426,10 +427,11 @@ static _Bool db_write_next_field_values(PwsDb *pdb, const PwsFieldType type, con
 
     // UUID is stored in the database in binary,
     // convert from text
-    char uuid[16];
+    const size_t uuid_len = 16;
+    char uuid[uuid_len];
     if (type == FT_UUID)
     {
-        uuid_hex_to_bin(value, (unsigned char *)uuid);
+        uuid_hex_to_bin(value, (unsigned char *)uuid, uuid_len);
         p = uuid;
     }
     else
@@ -955,30 +957,37 @@ _Bool db_read_accounts(PwsDb *pdb, PwsDbRecord **records, int *rc)
     return true;
 }
 
-static _Bool db_ensure_record_has_uuid(PwsDbRecord *rec, PwsDbRecord *records, char *uuid)
+int pws_generate_uuid(char uuid[33])
+{
+    const size_t uuid_len = 32;
+    if (!generate_random((unsigned char *)uuid, uuid_len/2))
+    {
+        // It is probably better to write the record
+        // without an UUID than to fail.
+        // set_rc(rc, PRC_ERR_INIT_RANDOM);
+        // return false;
+        return PRC_ERR_FAIL;
+    }
+    uuid_bin_to_hex((unsigned char *)uuid, uuid, uuid_len/2);
+    uuid[uuid_len] = 0;
+    return PRC_SUCCESS;
+}
+
+static _Bool db_ensure_record_has_uuid(PwsDbRecord *rec, PwsDbRecord *records, char uuid[33])
 {
     if (rec_get_uuid(rec) == NULL)
     {
         _Bool is_unique = false;
         do
         {
-            if (!generate_random((unsigned char *)uuid, 16))
-            {
-                // It is probably better to write the record
-                // without an UUID than to fail.
-                // set_rc(rc, PRC_ERR_INIT_RANDOM);
-                // return false;
-                break;
-            }
-            uuid_bin_to_hex((unsigned char *)uuid, uuid);
-            uuid[32] = 0;
+            pws_generate_uuid(uuid);
             PwsDbRecord *r = records;
             while (r != NULL)
             {
                 if (r != rec)
                 {
                     const char *other_uuid;
-                    if ((other_uuid = rec_get_uuid(r)) != NULL && memcmp(uuid, other_uuid, 16) == 0)
+                    if ((other_uuid = rec_get_uuid(r)) != NULL && memcmp(uuid, other_uuid, 32) == 0)
                     {
                         break;
                     }
