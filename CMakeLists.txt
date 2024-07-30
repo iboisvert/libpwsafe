@@ -1,4 +1,6 @@
-cmake_minimum_required(VERSION 3.22)
+cmake_minimum_required(VERSION 3.13)
+find_package(PkgConfig REQUIRED)
+
 project(libpwsafe 
     VERSION 0.1 
     DESCRIPTION "Library for reading and writing Password Safe account database files" 
@@ -26,7 +28,8 @@ endif()
 if(LIBPWSAFE_BUILD_TESTS)
     find_package(GTest REQUIRED)
 endif()
-find_package(Nettle REQUIRED)
+pkg_check_modules(NETTLE REQUIRED nettle)
+
 CHECK_INCLUDE_FILES("sys/random.h" HAVE_SYS_RANDOM_H)
 CHECK_FUNCTION_EXISTS("getpwuid" HAVE_PWUID)
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/config.h.in" "${CMAKE_CURRENT_BINARY_DIR}/config.h")

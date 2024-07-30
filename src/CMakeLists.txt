@@ -1,15 +1,14 @@
-include_directories(${NETTLE_INCLUDE_DIR})
-
 list(APPEND SRC
     block.c
     db.c
     util.c
 )
 add_library(objlib OBJECT ${SRC})
+target_include_directories(objlib PUBLIC ${NETTLE_INCLUDE_DIRS})
 
 if(LIBPWSAFE_BUILD_STATIC)
-    add_library(pwsafeStatic STATIC $<TARGET_OBJECTS:objlib>)
-    target_link_libraries(pwsafeStatic PUBLIC pwsafe_api INTERFACE nettle)
+    add_library(pwsafeStatic STATIC)
+    target_link_libraries(pwsafeStatic PUBLIC pwsafe_api objlib INTERFACE nettle)
 
     # On Windows, static lib is libpwsafe.lib, DLL is pwsafe.dll/.lib
     # On Linux, static lib is libpwsafe.a, SO is libpwsafe.so
@@ -25,8 +24,8 @@ if(LIBPWSAFE_BUILD_STATIC)
 endif()
 
 if(LIBPWSAFE_BUILD_SHARED)
-    add_library(pwsafe SHARED $<TARGET_OBJECTS:objlib>)
-    target_link_libraries(pwsafe PUBLIC pwsafe_api nettle)
+    add_library(pwsafe SHARED)
+    target_link_libraries(pwsafe PRIVATE objlib PUBLIC pwsafe_api ${NETTLE_LINK_LIBRARIES})
 
     set_target_properties(pwsafe 
         PROPERTIES 
