@@ -6,6 +6,6 @@
     "build": {
         // Path is relataive to the devcontainer.json file.
         // "dockerfile": "Dockerfile-ubuntu"
-        "dockerfile": "Dockerfile-fedora"
+        "dockerfile": "Dockerfile-ubuntu"
     }
 }
