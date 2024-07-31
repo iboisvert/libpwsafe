@@ -11,26 +11,26 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - name: setup environment
+    - name: Setup environment
       run: |
         sudo apt-get -y update
-        sudo apt-get -y install cmake gcc g++ nettle-dev libgtest-dev doxygen
+        sudo apt-get -y install cmake gcc g++ doxygen
     - uses: actions/checkout@v2
-    - name: configure
-      run: cmake -DCMAKE_BUILD_TYPE:STRING=Release -B build
-    - name: build
+    - name: Configure
+      run: cmake --preset=default
+    - name: Build
       run: |
         cd build
         cmake --build . -t all
-    - name: test
+    - name: Test
       run: |
         cd build
         ctest
-    - name: package
+    - name: Package
       run: |
         cd build 
         cpack -G DEB
-    - name: push release
+    - name: Push release
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
       with:
