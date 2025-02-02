@@ -1,3 +1,5 @@
 #cmakedefine LIBPWSAFE_VERSION "@LIBPWSAFE_VERSION@"
 #cmakedefine HAVE_SYS_RANDOM_H
+#cmakedefine HAVE_ARC4RANDOM
+#cmakedefine HAVE_RANDOM
 #cmakedefine HAVE_PWUID

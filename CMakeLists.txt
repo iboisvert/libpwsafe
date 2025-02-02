@@ -30,7 +30,17 @@ if(LIBPWSAFE_BUILD_TESTS)
 endif()
 pkg_check_modules(NETTLE REQUIRED nettle)
 
-CHECK_INCLUDE_FILES("sys/random.h" HAVE_SYS_RANDOM_H)
+if(UNIX)
+    CHECK_FUNCTION_EXISTS("arc4random" HAVE_ARC4RANDOM)
+    if(NOT HAVE_ARC4RANDOM)
+        CHECK_FUNCTION_EXISTS("random" HAVE_RANDOM)
+    endif()
+else()
+    CHECK_INCLUDE_FILES("sys/random.h" HAVE_SYS_RANDOM_H)
+endif()
+if(NOT (HAVE_ARC4RANDOM OR HAVE_RANDOM OR HAVE_SYS_RANDOM_H))
+    message(FATAL_ERROR, "No random number generator found")
+endif()
 CHECK_FUNCTION_EXISTS("getpwuid" HAVE_PWUID)
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/config.h.in" "${CMAKE_CURRENT_BINARY_DIR}/config.h")
 
@@ -43,7 +53,7 @@ add_compile_definitions(
 )
 add_compile_options(
     -fPIC -Wall -Wextra
-    "$<$<CONFIG:DEBUG>:-ggdb;-O0;-fno-omit-frame-pointer>"
+    "$<$<CONFIG:DEBUG>:-O0;-fno-omit-frame-pointer>"
     "$<$<AND:$<CONFIG:DEBUG>,$<BOOL:${LIBPWSAFE_DEBUG_SANITIZE}>>:-fsanitize=address,undefined>"
 )
 add_link_options(

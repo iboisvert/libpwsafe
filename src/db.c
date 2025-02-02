@@ -180,12 +180,47 @@ static void generate_hash(Block input, uint8_t output[SHA1_DIGEST_SIZE], const c
     memset_func(&bf_ctx, 0, sizeof(bf_ctx));
 }
 
+// https://stackoverflow.com/a/3437484
+#define min(a,b) \
+    ({ const __typeof__ (a) _a = (a); \
+     const __typeof__ (b) _b = (b); \
+     _b < _a ? _b : _a; })
+
+static size_t pack_random(uint8_t *buf, size_t offset, const size_t len, const uint32_t r)
+{
+    const size_t size = min(sizeof(uint32_t), len-offset);
+    for (size_t i = 0; i < size; ++i)
+    {
+        *(buf+offset+i) = *((uint8_t*)(&r)+i);
+    }
+    return offset+size;
+}
+
 static inline _Bool generate_random(uint8_t *buf, size_t len)
 {
+    assert(len > 0);
 #ifdef HAVE_SYS_RANDOM_H
     return getrandom(buf, len, GRND_NONBLOCK) == (ssize_t)len;
 #else
+#ifdef HAVE_ARC4RANDOM
+    uint32_t r = 0;
+    for (size_t offset = 0; offset < len; offset = pack_random(buf, offset, len, r))
+    {
+        r = arc4random();
+    }
+    return true;
+#else
+#ifdef HAVE_RANDOM
+    uint32_t r = 0;
+    for (size_t offset = 0; offset < len; offset = pack_random(buf, offset, len, r))
+    {
+        r = (uint32_t)random();
+    }
+    return true;
+#else
   #error Function generate_random undefined
+#endif
+#endif
 #endif
 }
 
@@ -1135,3 +1170,4 @@ done:
     set_rc(rc, local_rc);
     return status;
 }
+
