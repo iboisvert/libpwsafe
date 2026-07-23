@@ -4,6 +4,7 @@ on:
   push:
     branches: 
       - main
+      - dev/*
     tags:
       - v*
 
@@ -14,10 +15,10 @@ jobs:
     - name: Setup environment
       run: |
         sudo apt-get -y update
-        sudo apt-get -y install cmake gcc g++ doxygen
+        sudo apt-get -y install cmake gcc g++ doxygen graphviz libgtest-dev nettle-dev
     - uses: actions/checkout@v2
     - name: Configure
-      run: cmake --preset=default
+      run: cmake -B build --preset=x64-linux-gcc-release
     - name: Build
       run: |
         cd build
