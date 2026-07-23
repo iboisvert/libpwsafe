@@ -6,7 +6,6 @@ target_link_libraries(
     pwsafeStatic
     GTest::gtest_main
 )
-target_link_directories(libpwsafe-test PRIVATE ${NETTLE_LIBRARY_DIRS})
 # TODO IMB 2024-07-29 Copy test resources after build
 #add_custom_target(
 #    TARGET libpwsafe-test POST_BUILD
@@ -16,4 +15,4 @@ target_link_directories(libpwsafe-test PRIVATE ${NETTLE_LIBRARY_DIRS})
 include(GoogleTest)
 gtest_discover_tests(libpwsafe-test WORKING_DIRECTORY "${CMAKE_BINARY_DIR}/../test")
 
-# add_test("unit tests" COMMAND libpwsafe-test)
+# add_test(NAME "unit tests" COMMAND libpwsafe-test)

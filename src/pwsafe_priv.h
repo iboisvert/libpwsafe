@@ -3,8 +3,9 @@
 #define HAVE_PWSAFE_PRIV_H
 
 #include "config.h"
-#include <nettle/sha1.h>
-#include <nettle/blowfish.h>
+#define OPENSSL_SUPPRESS_DEPRECATED
+#include <openssl/sha.h>
+#include <openssl/blowfish.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -13,6 +14,11 @@
 #ifdef __cplusplus
 extern "C"
 {
+#endif
+
+// Nettle exposed this macro; OpenSSL calls it SHA_DIGEST_LENGTH
+#ifndef SHA1_DIGEST_SIZE
+#define SHA1_DIGEST_SIZE SHA_DIGEST_LENGTH
 #endif
 
 // Prevent memset from being optimized out
@@ -54,7 +60,7 @@ typedef struct PwsDb
     FILE *db_file;
     Header db_header;
     PWSAFE_DB_VERSION db_vers;
-    struct blowfish_ctx bf_ctx;
+    BF_KEY bf_ctx;
     Block cbc;  // Always little-endian
 } PwsDb;
 
