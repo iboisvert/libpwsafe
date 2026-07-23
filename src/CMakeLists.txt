@@ -27,14 +27,22 @@ if(LIBPWSAFE_BUILD_SHARED)
     add_library(pwsafe SHARED)
     target_link_libraries(pwsafe PRIVATE objlib PUBLIC pwsafe_api OpenSSL::Crypto)
 
-    set_target_properties(pwsafe 
-        PROPERTIES 
+    set_target_properties(pwsafe
+        PROPERTIES
         VERSION ${LIBPWSAFE_VERSION}
-        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib")
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+        # MSVC does not export symbols by default; auto-export all so the
+        # DLL exposes the public API without per-symbol __declspec markup
+        WINDOWS_EXPORT_ALL_SYMBOLS ON)
     
     if(CMAKE_PROJECT_NAME STREQUAL "libpwsafe")
-        install(TARGETS pwsafe LIBRARY COMPONENT dev)
-        install(TARGETS pwsafe LIBRARY COMPONENT runtime)
+        # RUNTIME  -> .dll (Windows), LIBRARY -> .so (Unix),
+        # ARCHIVE  -> import .lib (Windows)
+        install(TARGETS pwsafe
+            RUNTIME COMPONENT runtime
+            LIBRARY COMPONENT runtime
+            ARCHIVE COMPONENT dev)
     endif()
 endif()
 

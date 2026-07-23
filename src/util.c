@@ -6,8 +6,8 @@
 #ifdef HAVE_PWUID
 #include <sys/types.h>
 #include <pwd.h>
-#endif
 #include <unistd.h>
+#endif
 #include <errno.h>
 
 enum SYS_BYTE_ORDER sys_byte_order;
