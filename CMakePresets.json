@@ -1,14 +1,27 @@
 {
-    "version": 1,
-    "configurePresets": [
-      {
-        "name": "default",
-        "generator": "Unix Makefiles",
-        "binaryDir": "${sourceDir}/build",
+  "version": 3,
+  "configurePresets": [
+    {
+        "name":  "base",
+        "hidden": true,
+        "generator":   "Ninja",
+        "binaryDir":   "${sourceDir}/build-${presetName}",
         "cacheVariables": {
-          "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
-          "CMAKE_BUILD_TYPE": "Release"
+            "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+            "CMAKE_INSTALL_RPATH": "$ORIGIN;$ORIGIN/.."
         }
-      }
-    ]
-  }
+    },
+    { "name": "debug",    "hidden": true, "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" } },
+    { "name": "release",  "hidden": true, "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" } },
+
+    {
+        "name": "x64-linux-gcc", "hidden": true,
+        "cacheVariables": {
+            "CMAKE_C_COMPILER": "gcc",
+            "CMAKE_CXX_COMPILER": "g++"
+        }
+    },
+    { "name": "x64-linux-gcc-debug", "inherits": [ "base", "x64-linux-gcc", "debug" ] },
+    { "name": "x64-linux-gcc-release", "inherits": [ "base", "x64-linux-gcc", "release" ] }
+  ]
+}
