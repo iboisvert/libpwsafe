@@ -4,8 +4,8 @@
     {
         "name":  "base",
         "hidden": true,
-        "generator":   "Ninja",
-        "binaryDir":   "${sourceDir}/build-${presetName}",
+        "generator": "Ninja",
+        "binaryDir": "${sourceDir}/build",
         "cacheVariables": {
             "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
             "CMAKE_INSTALL_RPATH": "$ORIGIN;$ORIGIN/.."
@@ -19,9 +19,37 @@
         "cacheVariables": {
             "CMAKE_C_COMPILER": "gcc",
             "CMAKE_CXX_COMPILER": "g++"
-        }
+        },
+        "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" }
     },
     { "name": "x64-linux-gcc-debug", "inherits": [ "base", "x64-linux-gcc", "debug" ] },
-    { "name": "x64-linux-gcc-release", "inherits": [ "base", "x64-linux-gcc", "release" ] }
+    { "name": "x64-linux-gcc-release", "inherits": [ "base", "x64-linux-gcc", "release" ] },
+
+    {
+        "name": "x64-windows-msvc", "hidden": true,
+        "generator": "Visual Studio 17 2022",
+        "architecture": "x64",
+        "binaryDir": "${sourceDir}/build",
+        "cacheVariables": {
+            "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+            "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+            "VCPKG_TARGET_TRIPLET": "x64-windows"
+        },
+        "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }
+    },
+    { "name": "x64-windows-msvc-debug", "inherits": [ "x64-windows-msvc", "debug" ] },
+    { "name": "x64-windows-msvc-release", "inherits": [ "x64-windows-msvc", "release" ] }
+  ],
+  "buildPresets": [
+    { "name": "x64-linux-gcc-debug", "configurePreset": "x64-linux-gcc-debug" },
+    { "name": "x64-linux-gcc-release", "configurePreset": "x64-linux-gcc-release" },
+    { "name": "x64-windows-msvc-debug", "configurePreset": "x64-windows-msvc-debug", "configuration": "Debug" },
+    { "name": "x64-windows-msvc-release", "configurePreset": "x64-windows-msvc-release", "configuration": "Release" }
+  ],
+  "testPresets": [
+    { "name": "x64-linux-gcc-debug", "configurePreset": "x64-linux-gcc-debug" },
+    { "name": "x64-linux-gcc-release", "configurePreset": "x64-linux-gcc-release" },
+    { "name": "x64-windows-msvc-debug", "configurePreset": "x64-windows-msvc-debug", "configuration": "Debug" },
+    { "name": "x64-windows-msvc-release", "configurePreset": "x64-windows-msvc-release", "configuration": "Release" }
   ]
 }

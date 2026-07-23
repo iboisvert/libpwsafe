@@ -18,15 +18,11 @@ jobs:
         sudo apt-get -y install cmake gcc g++ doxygen graphviz libgtest-dev nettle-dev
     - uses: actions/checkout@v2
     - name: Configure
-      run: cmake -B build --preset=x64-linux-gcc-release
+      run: cmake --preset=x64-linux-gcc-release
     - name: Build
-      run: |
-        cd build
-        cmake --build . -t all
+      run: cmake --build --preset=x64-linux-gcc-release
     - name: Test
-      run: |
-        cd build
-        ctest
+      run: ctest --preset=x64-linux-gcc-release
     - name: Package
       run: |
         cd build 

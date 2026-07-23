@@ -6,7 +6,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <ctype.h>
-#include <unistd.h>
+#include <stddef.h>
 #include <openssl/rand.h>
 
 // IMB 2023-01-01 Most of the code here is

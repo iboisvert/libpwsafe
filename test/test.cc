@@ -6,6 +6,20 @@
 #include <stdlib.h>
 #include <string>
 
+#ifdef _WIN32
+// MSVC has no POSIX setenv/unsetenv; emulate with _putenv_s.
+// Setting a variable to "" removes it from the environment on Windows.
+static int setenv(const char *name, const char *value, int overwrite)
+{
+    if (!overwrite && getenv(name)) return 0;
+    return _putenv_s(name, value);
+}
+static int unsetenv(const char *name)
+{
+    return _putenv_s(name, "");
+}
+#endif
+
 TEST(Test, Version)
 {
     ASSERT_STREQ(LIBPWSAFE_VERSION, pws_get_version());
