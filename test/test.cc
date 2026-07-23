@@ -79,12 +79,12 @@ TEST(Test, BlockEncodeDecodeSucceeds)
     uint8_t cbc[8] = {'1','2','3','4','5','6','7','8'};
 
     memset(&pdb.bf_ctx, 0, sizeof(pdb.bf_ctx));
-    blowfish_set_key(&pdb.bf_ctx, sizeof(key), (uint8_t *)key);
+    BF_set_key(&pdb.bf_ctx, sizeof(key), key);
     memcpy(pdb.cbc, cbc, 8);
     db_encode_block(&pdb, block);
 
     memset(&pdb.bf_ctx, 0, sizeof(pdb.bf_ctx));
-    blowfish_set_key(&pdb.bf_ctx, sizeof(key), (uint8_t *)key);
+    BF_set_key(&pdb.bf_ctx, sizeof(key), key);
     memcpy(pdb.cbc, cbc, 8);
     db_decode_block(&pdb, block);
 

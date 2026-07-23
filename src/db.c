@@ -7,10 +7,7 @@
 #include <stdbool.h>
 #include <ctype.h>
 #include <unistd.h>
-#ifdef HAVE_SYS_RANDOM_H
-#include <sys/random.h>
-#endif
-#include <nettle/sha2.h>
+#include <openssl/rand.h>
 
 // IMB 2023-01-01 Most of the code here is
 // adapted from code by Nicolas Dade https://github.com/nsd20463/pwsafe
@@ -134,30 +131,31 @@ static void generate_hash(Block input, uint8_t output[SHA1_DIGEST_SIZE], const c
 {
     // generate test hash from random and passphrase
     // I am mystified as to why Bruce uses these extra 2 zero bytes in the hashes
-    struct sha1_ctx sha_ctx;
-    sha1_init(&sha_ctx);
-    sha1_update(&sha_ctx, BLOCK_SIZE, input);
+    SHA_CTX sha_ctx;
+    SHA1_Init(&sha_ctx);
+    SHA1_Update(&sha_ctx, input, BLOCK_SIZE);
     static const unsigned char zeros[2] = {0, 0};
-    sha1_update(&sha_ctx, sizeof(zeros), zeros);
+    SHA1_Update(&sha_ctx, zeros, sizeof(zeros));
     size_t pw_len = strlen(pw);
-    sha1_update(&sha_ctx, pw_len, (const uint8_t *)pw);
+    SHA1_Update(&sha_ctx, (const uint8_t *)pw, pw_len);
     unsigned char key[SHA1_DIGEST_SIZE];
-    sha1_digest(&sha_ctx, sizeof(key), key);
+    SHA1_Final(key, &sha_ctx);
 
-    struct blowfish_ctx bf_ctx;
-    blowfish_set_key(&bf_ctx, sizeof(key), key);
+    BF_KEY bf_ctx;
+    BF_set_key(&bf_ctx, sizeof(key), key);
 
     Block block;
     memcpy(&block, input, BLOCK_SIZE);
 
-    // For nettle to match OpenSSL we must swap byte order before and after encrypt
+    // We must swap byte order before and after encrypt to mimic passwordsafe,
+    // which assumes little-endian i386 while Blowfish operates on big-endian words
     // TODO: test this on a big-endian machine
     swap_byte_order(block);
 
     // to mimic passwordsafe I use BF_encrypt() directly, but that means I have to pretend that I am on a little-endian
     // machine b/c passwordsafe assumes a i386
     for (int i = 0; i < 1000; ++i)
-        blowfish_encrypt(&bf_ctx, BLOCK_SIZE, (uint8_t *)&block, (const uint8_t *)&block);
+        BF_ecb_encrypt((const uint8_t *)&block, (uint8_t *)&block, &bf_ctx, BF_ENCRYPT);
 
     swap_byte_order(block);
 
@@ -170,11 +168,12 @@ static void generate_hash(Block input, uint8_t output[SHA1_DIGEST_SIZE], const c
     // The good thing is we are hashing something which is already well hashed, so I doubt this
     // opened up any holes. But it does show that one should always step the program in a debugger
     // and watch what the variables are doing; sometimes it is eye opening!
-    sha1_init(&sha_ctx);
-    memset_func(sha_ctx.state, 0, sizeof(sha_ctx.state));
-    sha1_update(&sha_ctx, BLOCK_SIZE, (const uint8_t *)block);
-    sha1_update(&sha_ctx, sizeof(zeros), zeros);
-    sha1_digest(&sha_ctx, SHA1_DIGEST_SIZE, output);
+    SHA1_Init(&sha_ctx);
+    // Zero the SHA1 state (h0..h4) to replicate the passwordsafe bug described above
+    sha_ctx.h0 = sha_ctx.h1 = sha_ctx.h2 = sha_ctx.h3 = sha_ctx.h4 = 0;
+    SHA1_Update(&sha_ctx, (const uint8_t *)block, BLOCK_SIZE);
+    SHA1_Update(&sha_ctx, zeros, sizeof(zeros));
+    SHA1_Final(output, &sha_ctx);
 
     memset_func(key, 0, sizeof(key));
     memset_func(&bf_ctx, 0, sizeof(bf_ctx));
@@ -182,11 +181,7 @@ static void generate_hash(Block input, uint8_t output[SHA1_DIGEST_SIZE], const c
 
 static inline _Bool generate_random(uint8_t *buf, size_t len)
 {
-#ifdef HAVE_SYS_RANDOM_H
-    return getrandom(buf, len, GRND_NONBLOCK) == (ssize_t)len;
-#else
-  #error Function generate_random undefined
-#endif
+    return RAND_bytes(buf, (int)len) == 1;
 }
 
 /**
@@ -262,7 +257,7 @@ void db_decode_block(PwsDb *pdb, Block block)
     // is because the blowfish implementation used in the original passwordsafe
     // operated on assumed little-endian 32-bit ints and not arrays of bytes
     swap_byte_order(block);
-    blowfish_decrypt(&pdb->bf_ctx, BLOCK_SIZE, (uint8_t *)block, (const uint8_t *)block);
+    BF_ecb_encrypt((const uint8_t *)block, (uint8_t *)block, &pdb->bf_ctx, BF_DECRYPT);
     swap_byte_order(block);
 
     const uint8_t *cbc = pdb->cbc;
@@ -284,7 +279,7 @@ void db_encode_block(PwsDb *pdb, Block block)
     }
 
     swap_byte_order(block);
-    blowfish_encrypt(&pdb->bf_ctx, BLOCK_SIZE, (uint8_t *)block, (const uint8_t *)block);
+    BF_ecb_encrypt((const uint8_t *)block, (uint8_t *)block, &pdb->bf_ctx, BF_ENCRYPT);
     swap_byte_order(block);
 
     memcpy(pdb->cbc, block, BLOCK_SIZE);
@@ -758,14 +753,14 @@ static void db_compute_key(PwsDb *pdb, const char *pw)
 {
     Header *h = &pdb->db_header;
     memcpy(pdb->cbc, h->iv, sizeof(pdb->cbc));
-    struct sha1_ctx ctx;
-    sha1_init(&ctx);
+    SHA_CTX ctx;
+    SHA1_Init(&ctx);
     size_t pw_len = strlen(pw);
-    sha1_update(&ctx, pw_len, (const uint8_t *)pw);
-    sha1_update(&ctx, sizeof(h->salt), h->salt);
+    SHA1_Update(&ctx, (const uint8_t *)pw, pw_len);
+    SHA1_Update(&ctx, h->salt, sizeof(h->salt));
     uint8_t key[SHA1_DIGEST_SIZE];
-    sha1_digest(&ctx, sizeof(key), key);
-    blowfish_set_key(&pdb->bf_ctx, sizeof(key), key);
+    SHA1_Final(key, &ctx);
+    BF_set_key(&pdb->bf_ctx, sizeof(key), key);
 }
 
 /** Sanity checks */

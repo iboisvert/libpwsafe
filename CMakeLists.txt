@@ -28,9 +28,8 @@ endif()
 if(LIBPWSAFE_BUILD_TESTS)
     find_package(GTest REQUIRED)
 endif()
-pkg_check_modules(NETTLE REQUIRED nettle)
+find_package(OpenSSL REQUIRED)
 
-CHECK_INCLUDE_FILES("sys/random.h" HAVE_SYS_RANDOM_H)
 CHECK_FUNCTION_EXISTS("getpwuid" HAVE_PWUID)
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/config.h.in" "${CMAKE_CURRENT_BINARY_DIR}/config.h")
 
