@@ -46,30 +46,18 @@ if(LIBPWSAFE_BUILD_TESTS)
     enable_testing()
 endif()
 
+# Compiler warnings and debug flags live in cmake/toolchain-*.cmake,
+# selected via CMAKE_TOOLCHAIN_FILE in CMakePresets.json
+
 add_compile_definitions(
     "$<$<CONFIG:RELEASE>:NDEBUG>"
 )
-
-if(MSVC)
-    add_compile_definitions(
-        # Silence warnings for POSIX/C-runtime names (strdup, fopen, ...)
-        _CRT_SECURE_NO_WARNINGS
-        _CRT_NONSTDC_NO_WARNINGS
-    )
-    add_compile_options(
-        /W3
-        "$<$<CONFIG:DEBUG>:/Od;/Zi>"
-    )
-else()
-    add_compile_options(
-        -Wall -Wextra
-        "$<$<CONFIG:DEBUG>:-ggdb;-O0;-fno-omit-frame-pointer>"
-        "$<$<AND:$<CONFIG:DEBUG>,$<BOOL:${LIBPWSAFE_DEBUG_SANITIZE}>>:-fsanitize=address,undefined>"
-    )
-    add_link_options(
-        "$<$<AND:$<CONFIG:DEBUG>,$<BOOL:${LIBPWSAFE_DEBUG_SANITIZE}>>:-fsanitize=address,undefined>"
-    )
-endif()
+add_compile_options(
+    "$<$<AND:$<CONFIG:DEBUG>,$<BOOL:${LIBPWSAFE_DEBUG_SANITIZE}>>:${LIBPWSAFE_SANITIZE_FLAGS}>"
+)
+add_link_options(
+    "$<$<AND:$<CONFIG:DEBUG>,$<BOOL:${LIBPWSAFE_DEBUG_SANITIZE}>>:${LIBPWSAFE_SANITIZE_FLAGS}>"
+)
 
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 include_directories(api)

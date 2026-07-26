@@ -7,8 +7,7 @@
         "generator": "Ninja",
         "binaryDir": "${sourceDir}/build",
         "cacheVariables": {
-            "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-            "CMAKE_INSTALL_RPATH": "$ORIGIN;$ORIGIN/.."
+            "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
         }
     },
     { "name": "debug",    "hidden": true, "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" } },
@@ -17,8 +16,7 @@
     {
         "name": "x64-linux-gcc", "hidden": true,
         "cacheVariables": {
-            "CMAKE_C_COMPILER": "gcc",
-            "CMAKE_CXX_COMPILER": "g++"
+            "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain-linux-gcc.cmake"
         },
         "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" }
     },
@@ -27,12 +25,12 @@
 
     {
         "name": "x64-windows-msvc", "hidden": true,
-        "generator": "Visual Studio 17 2022",
         "architecture": "x64",
         "binaryDir": "${sourceDir}/build",
         "cacheVariables": {
             "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
             "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+            "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/cmake/toolchain-windows-msvc.cmake",
             "VCPKG_TARGET_TRIPLET": "x64-windows"
         },
         "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" }

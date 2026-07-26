@@ -108,7 +108,7 @@ TEST(Test, BlockEncodeDecodeSucceeds)
 TEST(Test, CheckPassword)
 {
     int rc = -1;
-    _Bool result = pws_db_check_password("data/test-v2-empty.dat", "improbable", &rc);
+    bool result = pws_db_check_password("data/test-v2-empty.dat", "improbable", &rc);
     ASSERT_FALSE(result);
     EXPECT_EQ(PRC_ERR_INCORRECT_PW, rc);
 
@@ -122,7 +122,7 @@ TEST(Test, OpenFailsNoFileFails)
 {
     int rc = -1;
     PwsDbRecord *records;
-    _Bool status = pws_db_read("/nonexistent", "password", &records, &rc);
+    bool status = pws_db_read("/nonexistent", "password", &records, &rc);
     ASSERT_FALSE(status);
     EXPECT_EQ(PRC_ERR_OPEN, rc);
 }
@@ -131,7 +131,7 @@ TEST(Test, OpenEmptyDbV1Succeeds)
 {
     int rc = -1;
     PwsDbRecord *records;
-    _Bool status = pws_db_read("data/test-v1-empty.dat", "password", &records, &rc);
+    bool status = pws_db_read("data/test-v1-empty.dat", "password", &records, &rc);
     ASSERT_TRUE(status);
     EXPECT_EQ(PRC_SUCCESS, rc);
 
@@ -142,7 +142,7 @@ TEST(Test, OpenEmptyDbV2Succeeds)
 {
     int rc = -1;
     PwsDbRecord *records;
-    _Bool status = pws_db_read("data/test-v2-empty.dat", "password", &records, &rc);
+    bool status = pws_db_read("data/test-v2-empty.dat", "password", &records, &rc);
     ASSERT_TRUE(status);
     EXPECT_EQ(PRC_SUCCESS, rc);
     EXPECT_EQ(nullptr, records);
@@ -152,7 +152,7 @@ TEST(Test, OpenEmptyDbV2WithIncorrectPasswordFails)
 {
     int rc = -1;
     PwsDbRecord *records;
-    _Bool status = pws_db_read("data/test-v2-empty.dat", "foobar", &records, &rc);
+    bool status = pws_db_read("data/test-v2-empty.dat", "foobar", &records, &rc);
     ASSERT_FALSE(status);
     EXPECT_EQ(PRC_ERR_INCORRECT_PW, rc);
 }
@@ -176,7 +176,7 @@ TEST(Test, ReadDbV1Succeeds)
 {
     int rc = -1;
     PwsDbRecord *records;
-    _Bool status = pws_db_read("data/test-v1.dat", "password", &records, &rc);
+    bool status = pws_db_read("data/test-v1.dat", "password", &records, &rc);
     ASSERT_TRUE(status);
     EXPECT_EQ(PRC_SUCCESS, rc);
 
@@ -227,7 +227,7 @@ TEST(Test, ReadDbV2Succeeds)
 {
     int rc = -1;
     PwsDbRecord *records;
-    _Bool status = pws_db_read("data/test-v2.dat", "password", &records, &rc);
+    bool status = pws_db_read("data/test-v2.dat", "password", &records, &rc);
     ASSERT_TRUE(status);
     EXPECT_EQ(PRC_SUCCESS, rc);
     EXPECT_EQ(nullptr, records->next);
@@ -260,7 +260,7 @@ TEST(Test, WriteEmptyDatabaseSucceeds)
 
     rc = (int)-1;
     PwsDbRecord *records;
-    _Bool status = pws_db_read(pathname, "password", &records, &rc);
+    bool status = pws_db_read(pathname, "password", &records, &rc);
     ASSERT_TRUE(status);
     EXPECT_EQ(nullptr, records);
     EXPECT_EQ(PRC_SUCCESS, rc);
@@ -290,7 +290,7 @@ TEST(Test, WriteRecordWithNoUuidSucceeds)
     rc = (int)-1;
 
     PwsDbRecord *records;
-    _Bool status = pws_db_read(pathname, password, &records, &rc);
+    bool status = pws_db_read(pathname, password, &records, &rc);
     ASSERT_TRUE(status);
     EXPECT_NE(nullptr, records);
     EXPECT_EQ(PRC_SUCCESS, rc);
@@ -320,7 +320,7 @@ TEST(Test, WriteRecordWithUuidSucceeds)
     rc = (int)-1;
 
     PwsDbRecord *records;
-    _Bool status = pws_db_read(pathname, password, &records, &rc);
+    bool status = pws_db_read(pathname, password, &records, &rc);
     ASSERT_TRUE(status);
     EXPECT_NE(nullptr, records);
     EXPECT_EQ(PRC_SUCCESS, rc);

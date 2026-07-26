@@ -87,28 +87,28 @@ void uuid_bin_to_hex(const uint8_t *uuid, char *suuid, size_t uuid_len);
  * \param uuid_len length of the uuid argument. 
  *   The array pointed to by `suuid` must be at least twice as long as `uuid_len`
  */
-_Bool uuid_hex_to_bin(const char *suuid, uint8_t *uuid, size_t uuid_len);
+bool uuid_hex_to_bin(const char *suuid, uint8_t *uuid, size_t uuid_len);
 
 /** Allocate db record */
 struct PwsDbRecord *alloc_record();
 
 /** Open a database */
-_Bool db_open(const char *pathname, const char *password, struct PwsDb *pdb, int *rc);
+bool db_open(const char *pathname, const char *password, struct PwsDb *pdb, int *rc);
 
 /** Read accounts from a database, call after db_open() */
-_Bool db_read_accounts(PwsDb *pdb, struct PwsDbRecord **records, int *rc);
+bool db_read_accounts(PwsDb *pdb, struct PwsDbRecord **records, int *rc);
 
 /** Initialize a new database header */
-extern _Bool db_init_header(struct Header *h, const char *pw, int *rc);
+extern bool db_init_header(struct Header *h, const char *pw, int *rc);
 
-extern _Bool db_check_password(struct Header *h, const char *pw, int *rc);
+extern bool db_check_password(struct Header *h, const char *pw, int *rc);
 
 extern void db_encode_block(struct PwsDb *pdb, Block block);
 extern void db_decode_block(struct PwsDb *pdb, Block block);
 
 // Helpers
 extern const char *trim_right(const char *pbegin, char *pend);
-extern _Bool is_ws(const char c);
+extern bool is_ws(const char c);
 
 extern const char *get_default_user();
 
