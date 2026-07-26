@@ -25,7 +25,7 @@ void eval_sys_byte_order()
         sys_byte_order = SBE_BIG_ENDIAN;
 }
 
-_Bool is_ws(const char c)
+bool is_ws(const char c)
 {
     return c == ' ' || c == '\n' || c == '\r' || c == '\t';
 }
@@ -92,7 +92,7 @@ void uuid_bin_to_hex(const uint8_t *uuid, char *suuid, size_t uuid_len)
     }
 }
 
-_Bool uuid_hex_to_bin(const char *suuid, uint8_t *uuid, size_t uuid_len)
+bool uuid_hex_to_bin(const char *suuid, uint8_t *uuid, size_t uuid_len)
 {
     assert(uuid_len%2 == 0);
     errno = 0;
@@ -101,7 +101,7 @@ _Bool uuid_hex_to_bin(const char *suuid, uint8_t *uuid, size_t uuid_len)
     {
         byte[0] = suuid[2*i];
         byte[1] = suuid[2*i+1];
-        uuid[i] = strtol(byte, NULL, 16);
+        uuid[i] = (uint8_t)strtol(byte, NULL, 16);
         if (errno)
         {
             return false;

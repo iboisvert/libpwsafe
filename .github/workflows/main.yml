@@ -9,13 +9,13 @@ on:
       - v*
 
 jobs:
-  build:
+  build-linux:
     runs-on: ubuntu-latest
     steps:
     - name: Setup environment
       run: |
         sudo apt-get -y update
-        sudo apt-get -y install cmake gcc g++ doxygen graphviz libgtest-dev nettle-dev
+        sudo apt-get -y install cmake ninja-build gcc g++ doxygen graphviz libgtest-dev libssl-dev
     - uses: actions/checkout@v2
     - name: Configure
       run: cmake --preset=x64-linux-gcc-release
@@ -25,14 +25,43 @@ jobs:
       run: ctest --preset=x64-linux-gcc-release
     - name: Package
       run: |
-        cd build 
-        cpack -G DEB
+        cd build
+        cpack -G TGZ
     - name: Push release
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
       with:
-        files: build/*.deb
+        files: build/*.tar.gz
     #- name: make check
     #  run: make check
     #- name: make distcheck
     #  run: make distcheck
+
+  build-windows:
+    runs-on: windows-latest
+    env:
+      VCPKG_ROOT: C:\vcpkg
+    steps:
+    - uses: actions/checkout@v2
+    - name: Enable MSVC dev environment
+      uses: ilammy/msvc-dev-cmd@v1
+    - name: Cache vcpkg packages
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.workspace }}\build\vcpkg_installed
+        key: vcpkg-x64-windows-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json') }}
+    - name: Configure
+      run: cmake --preset=x64-windows-msvc-release
+    - name: Build
+      run: cmake --build --preset=x64-windows-msvc-release
+    - name: Test
+      run: ctest --preset=x64-windows-msvc-release
+    - name: Package
+      run: |
+        cd build
+        cpack -G ZIP
+    - name: Push release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: build/*.zip
