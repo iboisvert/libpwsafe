@@ -31,6 +31,8 @@ include(CheckFunctionExists)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
+find_file(CLANG_TIDY_EXE clang-tidy PATHS /usr/bin /bin NO_DEFAULT_PATH DOC "clang-tidy path")
+
 if(LIBPWSAFE_BUILD_DOCS)
     find_package(Doxygen REQUIRED)
 endif()

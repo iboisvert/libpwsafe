@@ -4,7 +4,7 @@
 	"name": "devcontainers/cpp",
 	"build": {
         // Path is relataive to the devcontainer.json file.
-		"dockerfile": "Dockerfile-ubuntu"
+		"dockerfile": "Dockerfile-ubuntu-clang"
 	}
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
