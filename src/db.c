@@ -226,7 +226,10 @@ bool db_check_password(Header *h, const char *pw, int *rc)
 
 const char *pws_rec_get_field(const PwsDbRecord *record, PwsFieldType ft)
 {
-    assert(record);
+    if (record == NULL)
+    {
+        return NULL;
+    }
     const PwsDbField *field = record->fields;
     while (field != NULL && field->type != ft)
     {
@@ -343,17 +346,27 @@ static bool db_read_next_field(PwsDb *pdb, PwsDbField **field, int *rc)
     char *str;
 
     type = block[4];
-    int32_t len = *(int32_t *)(block);
+    int32_t len;
+    memcpy(&len, block, sizeof(len));
     if (len < 0 || len > 64 * 1024)
     {
         set_rc(rc, PRC_ERR_CORRUPT_DB);
         return false;
     }
 
+    const size_t uuid_len = 32;
     size_t nblocks = (len + BLOCK_SIZE - 1) / BLOCK_SIZE;
     // Always read at least one block
     if (nblocks < 1) nblocks = 1;
-    str = malloc(nblocks*BLOCK_SIZE + 1);
+    size_t alloc_len = nblocks*BLOCK_SIZE + 1;
+    // A UUID is converted in place to a hex string of uuid_len chars,
+    // so make sure the buffer is big enough and zero-filled even if the
+    // stored field is shorter than 16 bytes
+    if (type == FT_UUID && alloc_len < uuid_len + 1)
+    {
+        alloc_len = uuid_len + 1;
+    }
+    str = calloc(alloc_len, 1);
     if (!str)
     {
         set_rc(rc, PRC_ERR_ALLOC);
@@ -379,16 +392,7 @@ static bool db_read_next_field(PwsDb *pdb, PwsDbField **field, int *rc)
     // convert to text for convenience
     if (type == FT_UUID)
     {
-        const size_t uuid_len = 32;
-        char *uuid = realloc(str, uuid_len+1);
-        if (!uuid)
-        {
-            free(str);
-            set_rc(rc, PRC_ERR_ALLOC);
-            return false;
-        }
-        uuid_bin_to_hex((unsigned char *)uuid, uuid, uuid_len/2);
-        str = uuid;
+        uuid_bin_to_hex((unsigned char *)str, str, uuid_len/2);
         str[uuid_len] = 0;
     }
 
@@ -406,17 +410,9 @@ static bool db_read_next_field(PwsDb *pdb, PwsDbField **field, int *rc)
 static bool db_write_next_field_values(PwsDb *pdb, const PwsFieldType type, const char *value, int *rc)
 {
     assert(pdb);
-    assert(value);
 
+    // Fields with no value are silently ignored (see pws_db_write)
     if (!value) return true;
-
-    const uint32_t len = (type == FT_UUID) ? 16 : (uint32_t)strlen(value);
-
-    Block block;
-    make_block_le(block, type, len);
-    
-    if (!db_write_block(pdb, block, rc))
-        return false;
 
     const char *p = NULL;
 
@@ -426,7 +422,12 @@ static bool db_write_next_field_values(PwsDb *pdb, const PwsFieldType type, cons
     char uuid[16];
     if (type == FT_UUID)
     {
-        uuid_hex_to_bin(value, (unsigned char *)uuid, uuid_len);
+        if (strlen(value) != uuid_len*2
+            || !uuid_hex_to_bin(value, (unsigned char *)uuid, uuid_len))
+        {
+            set_rc(rc, PRC_ERR_INVALID_ARG);
+            return false;
+        }
         p = uuid;
     }
     else
@@ -434,18 +435,27 @@ static bool db_write_next_field_values(PwsDb *pdb, const PwsFieldType type, cons
         p = value;
     }
 
-    const char *pend = p + len;
-    for ( ; p < pend-BLOCK_SIZE; p += BLOCK_SIZE)
+    const uint32_t len = (type == FT_UUID) ? (uint32_t)uuid_len : (uint32_t)strlen(value);
+
+    Block block;
+    make_block_le(block, type, len);
+
+    if (!db_write_block(pdb, block, rc))
+        return false;
+
+    // Write all full blocks except the last one
+    size_t offset = 0;
+    for ( ; offset + BLOCK_SIZE < len; offset += BLOCK_SIZE)
     {
-        memcpy(block, p, BLOCK_SIZE);
+        memcpy(block, p + offset, BLOCK_SIZE);
         if (!db_write_block(pdb, block, rc))
             return false;
     }
     // Pad string out to multiple of block length
     zero_block(block);
-    if (pend > p)
+    if (len > offset)
     {
-        memcpy(block, p, pend-p);
+        memcpy(block, p + offset, len - offset);
     }
     // Always write at least one block
     if (!db_write_block(pdb, block, rc))
@@ -492,6 +502,9 @@ static bool db_read_next_v1_record(PwsDb *pdb, PwsDbField** fields, int *rc)
             status = false;
             goto done;
         }
+        // Link immediately so the field is freed by the caller on failure
+        p->next = phead;
+        phead = p;
         size_t len = pos - name;
         p->value = malloc(len+1);
         if (!p->value)
@@ -500,10 +513,8 @@ static bool db_read_next_v1_record(PwsDb *pdb, PwsDbField** fields, int *rc)
             status = false;
             goto done;
         }
-        strncpy(p->value, name, len);
+        memcpy(p->value, name, len);
         trim_right(p->value, p->value+len);
-        p->next = phead;
-        phead = p;
 
         /*
          * IMB 2023-01-10 From Rony Shapiro
@@ -516,6 +527,7 @@ static bool db_read_next_v1_record(PwsDb *pdb, PwsDbField** fields, int *rc)
         */
         if (*pos == SPLIT_CHAR || *pos == DEFAULT_USER_CHAR)
         {
+            const char split = *pos;
             p = alloc_field(FT_USER, /*value*/NULL);
             if (!p)
             {
@@ -523,10 +535,14 @@ static bool db_read_next_v1_record(PwsDb *pdb, PwsDbField** fields, int *rc)
                 status = false;
                 goto done;
             }
-            if (*pos == SPLIT_CHAR)
+            p->next = phead;
+            phead = p;
+            if (split == SPLIT_CHAR)
             {
                 // split name_login if it contains the magic split char
-                size_t len = strlen(pos+1);
+                // skip leading whitespace after the split char
+                while (is_ws(*++pos)) ;
+                size_t len = strlen(pos);
                 p->value = malloc(len+1);
                 if (!p->value)
                 {
@@ -534,8 +550,7 @@ static bool db_read_next_v1_record(PwsDb *pdb, PwsDbField** fields, int *rc)
                     status = false;
                     goto done;
                 }
-                while (is_ws(*++pos) && *pos != 0) ;
-                strncpy(p->value, pos, len);
+                memcpy(p->value, pos, len);
                 trim_right(p->value, p->value+len);
             }
             else //if (*pos == DEFAULT_USER_CHAR)
@@ -551,9 +566,17 @@ static bool db_read_next_v1_record(PwsDb *pdb, PwsDbField** fields, int *rc)
                     status = false;
                     goto done;
                 }
-                strncpy(p->value, default_user, len+1);
+                memcpy(p->value, default_user, len+1);
                 trim_right(p->value, p->value+len);
             }
+        }
+    }
+    if (status)
+    {
+        status = db_read_next_field(pdb, &p, rc);
+        if (status)
+        {
+            p->type = FT_PASSWORD;
             p->next = phead;
             phead = p;
         }
@@ -561,16 +584,17 @@ static bool db_read_next_v1_record(PwsDb *pdb, PwsDbField** fields, int *rc)
     if (status)
     {
         status = db_read_next_field(pdb, &p, rc);
-        p->type = FT_PASSWORD;
-        p->next = phead;
-        phead = p;
+        if (status)
+        {
+            p->type = FT_NOTES;
+            p->next = phead;
+            phead = p;
+        }
     }
-    if (status)
+    if (!status && phead != NULL && rc && *rc == PRC_ERR_EOF)
     {
-        status = db_read_next_field(pdb, &p, rc);
-        p->type = FT_NOTES;
-        p->next = phead;
-        phead = p;
+        // EOF part way through a record means the file is truncated
+        set_rc(rc, PRC_ERR_CORRUPT_DB);
     }
 
 done:
@@ -600,7 +624,7 @@ static bool db_read_next_v2_record(PwsDb *pdb, PwsDbField** fields, int *rc)
             pfield->next = phead;
             phead = pfield;
         }
-        else if (count > 1 && *rc == PRC_ERR_EOF)
+        else if (count > 1 && rc && *rc == PRC_ERR_EOF)
         {
             // Encountering EOF without reading FT_END field
             // should maybe be an error?
@@ -608,9 +632,10 @@ static bool db_read_next_v2_record(PwsDb *pdb, PwsDbField** fields, int *rc)
     }
     if (count == FT_END)
     {
-        // We've read too many fields for a single record, 
+        // We've read too many fields for a single record,
         // something is not right
         set_rc(rc, PRC_ERR_CORRUPT_DB);
+        status = false;
     }
 
 done:
@@ -657,7 +682,7 @@ static bool db_write_next_v2_record(PwsDb *pdb, const PwsDbField* fields, const 
     bool has_title = false;
     while (field && field->type != FT_END)
     {
-        if (field->type == FT_TITLE && strlen(field->value) > 0)
+        if (field->type == FT_TITLE && field->value && strlen(field->value) > 0)
         {
             has_title = true;
         }
@@ -681,16 +706,19 @@ static bool db_write_next_v2_record(PwsDb *pdb, const PwsDbField* fields, const 
             }
             break;
         }
-        db_write_next_field(pdb, field, rc);
+        if (!db_write_next_field(pdb, field, rc))
+            return false;
         field = field->next;
     }
     field = extras;
     while (field)
     {
-        db_write_next_field(pdb, field, rc);
+        if (!db_write_next_field(pdb, field, rc))
+            return false;
         field = field->next;
     }
-    db_write_next_field(pdb, &DB_FIELD_END, rc);
+    if (!db_write_next_field(pdb, &DB_FIELD_END, rc))
+        return false;
 
     set_rc(rc, PRC_SUCCESS);
     return true;
@@ -721,11 +749,15 @@ static bool db_read_next_record(PwsDb *pdb, PwsDbRecord** record, int *rc)
         }
         prec->fields = fields;
     }
-    else if (*rc == PRC_ERR_EOF)
+    else
     {
+        // Partially-read fields are not returned to the caller
         free_fields(fields);
-        // EOF on first block is not an error
-        set_rc(rc, PRC_SUCCESS);
+        if (rc && *rc == PRC_ERR_EOF)
+        {
+            // EOF on first block is not an error
+            set_rc(rc, PRC_SUCCESS);
+        }
     }
     return status;
 }
@@ -778,9 +810,12 @@ static bool check_invalid_uuid(PwsDbRecord *prec, int *rc)
 {
     while (prec != NULL)
     {
-        const char *value = pws_rec_get_field(prec, FT_UUID);
-        if (value)
+        // Check every UUID field, not just the first: all of them are written
+        for (const PwsDbField *field = prec->fields; field != NULL; field = field->next)
         {
+            if (field->type != FT_UUID || field->value == NULL)
+                continue;
+            const char *value = field->value;
             size_t len = strlen(value);
             if (len != 32)
             {
@@ -789,7 +824,8 @@ static bool check_invalid_uuid(PwsDbRecord *prec, int *rc)
             }
             for (size_t i = 0; i < len; ++i)
             {
-                if (!isxdigit(value[i]))
+                // isxdigit() requires a value representable as unsigned char
+                if (!isxdigit((unsigned char)value[i]))
                 {
                     set_rc(rc, PRC_ERR_INVALID_ARG);
                     return false;
@@ -937,7 +973,8 @@ bool db_read_accounts(PwsDb *pdb, PwsDbRecord **records, int *rc)
         {
             // No title field == something is wrong
             set_rc(rc, PRC_ERR_CORRUPT_DB);
-            free(p);
+            free_record(p);
+            pws_free_db_records(phead);
             return false;
         }
 
@@ -947,8 +984,14 @@ bool db_read_accounts(PwsDb *pdb, PwsDbRecord **records, int *rc)
         status = db_read_next_record(pdb, &p, &local_rc);
     }
 
-    *records = phead;
     set_rc(rc, local_rc);
+    if (local_rc != PRC_SUCCESS)
+    {
+        // Don't return a partial list of records along with an error
+        pws_free_db_records(phead);
+        return false;
+    }
+    *records = phead;
     return true;
 }
 
@@ -975,7 +1018,12 @@ static bool db_ensure_record_has_uuid(PwsDbRecord *rec, PwsDbRecord *records, ch
         bool is_unique = false;
         do
         {
-            pws_generate_uuid(uuid);
+            if (pws_generate_uuid(uuid) != PRC_SUCCESS)
+            {
+                // `uuid` was not filled in. It is better to write the
+                // record without a UUID than to fail.
+                return false;
+            }
             PwsDbRecord *r = records;
             while (r != NULL)
             {
@@ -1037,6 +1085,7 @@ PWSAFE_EXTERN int pws_db_read(const char *pathname, const char *password, PwsDbR
     if (!check_invalid_args(pathname && password && records, rc))
         return false;
 
+    *records = NULL;
     eval_sys_byte_order();
 
     int local_rc = PRC_SUCCESS;
@@ -1082,7 +1131,7 @@ PWSAFE_EXTERN int pws_db_write(const char *pathname,
     pdb.db_file = f;
 
     if (!db_init_header(&pdb.db_header, password, &local_rc)
-        || !db_write_header(&pdb, rc))
+        || !db_write_header(&pdb, &local_rc))
     {
         goto done;
     }

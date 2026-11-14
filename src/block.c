@@ -1,5 +1,6 @@
 /* Copyright 2023 Ian Boisvert */
 #include "pwsafe_priv.h"
+#include <string.h>
 
 // Byte ordering
 // inline uint32_t identity(uint32_t val) { return val; }
@@ -22,18 +23,24 @@ static inline uint32_t pws_bswap32(uint32_t x)
 #endif
 
 /** Swap block byte order le<=>be */
+// Blocks are byte arrays with no alignment guarantee, so 32-bit words
+// are accessed with memcpy rather than by casting the pointer.
 void swap_byte_order(Block b)
 {
-    uint32_t *l = (uint32_t *)(b), *h = (uint32_t *)(b + 4);
-    *l = pws_bswap32(*l);
-    *h = pws_bswap32(*h);
+    uint32_t l, h;
+    memcpy(&l, b, sizeof(l));
+    memcpy(&h, b + 4, sizeof(h));
+    l = pws_bswap32(l);
+    h = pws_bswap32(h);
+    memcpy(b, &l, sizeof(l));
+    memcpy(b + 4, &h, sizeof(h));
 }
 
 /** Make a block composed of two little-endian unsigned ints */
 void make_block_le(Block b, uint32_t h, uint32_t l)
 {
-    *(uint32_t *)(b) = l;
-    *(uint32_t *)(b+4) = h;
+    memcpy(b, &l, sizeof(l));
+    memcpy(b + 4, &h, sizeof(h));
     if (sys_byte_order == SBE_BIG_ENDIAN)
         swap_byte_order(b);
 }
