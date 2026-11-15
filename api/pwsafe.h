@@ -159,6 +159,12 @@ PWSAFE_EXTERN int pws_db_record_count(const PwsDbRecord *records);
  * \returns `true` if operation succeeded, `false` otherwise
  * \note
  * If the file `pathname` already exists, it will be overwritten.
+ * The database is first written to a temporary file in the same directory,
+ * which replaces `pathname` only if the whole write succeeds; if the
+ * function returns `false`, an existing `pathname` is left unchanged.
+ * \note
+ * If any field value is longer than 65536 bytes, the function will return
+ * `false` and `rc` will be set to `PWS_ERR_INVALID_ARG`.
  * \note
  * It is not necessary to terminate the fields of a record with
  * a field of type `FT_END`. If a field of type `FT_END` is present
