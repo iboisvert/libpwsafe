@@ -42,9 +42,10 @@ const char *trim_right(const char *pbegin, char *pend)
 {
     assert(pend);
     assert(pbegin);
-    assert(pend > pbegin);
-    while (pend-- > pbegin && is_ws(*pend)) ;
-    *(pend+1) = 0;
+    assert(pend >= pbegin);
+    // An empty string is valid (e.g. an empty title, or an empty default user)
+    while (pend > pbegin && is_ws(*(pend-1))) --pend;
+    *pend = 0;
     return pbegin;
 }
 

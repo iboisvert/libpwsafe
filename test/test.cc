@@ -402,3 +402,242 @@ TEST(Test, TestAllocateFieldSucceeds)
 
     pws_free_db_records(prec);
 }
+
+// --- Regression tests for review-stability fixes ---
+
+#include <fstream>
+#include <iterator>
+#include <vector>
+
+static std::vector<char> read_file(const char *pathname)
+{
+    std::ifstream in(pathname, std::ios::binary);
+    return std::vector<char>(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+}
+
+static void write_file(const char *pathname, const char *data, size_t len)
+{
+    std::ofstream out(pathname, std::ios::binary | std::ios::trunc);
+    out.write(data, (std::streamsize)len);
+}
+
+TEST(Test, TrimRightEmptyString)
+{
+    char s[1] = {0};
+    EXPECT_STREQ("", trim_right(s, s));
+}
+
+TEST(Test, TrimRightTrailingWhitespaceOnly)
+{
+    std::string s{"ab \t"};
+    EXPECT_STREQ("ab", trim_right(s.data(), s.data() + s.length()));
+}
+
+TEST(Test, GetFieldOfNullRecordReturnsNull)
+{
+    EXPECT_EQ(nullptr, pws_rec_get_field(nullptr, FT_TITLE));
+}
+
+TEST(Test, ReadTruncatedDbV1Fails)
+{
+    std::vector<char> data = read_file("data/test-v1.dat");
+    ASSERT_EQ(200u, data.size());
+    char pathname[L_tmpnam + 1];
+    (void)!tmpnam(pathname);
+
+    // Header (56) + name field (8 + 16), then EOF before the password field
+    write_file(pathname, data.data(), 80);
+    int rc = -1;
+    PwsDbRecord *records = (PwsDbRecord *)0x1;
+    EXPECT_FALSE(pws_db_read(pathname, "password", &records, &rc));
+    EXPECT_EQ(PRC_ERR_CORRUPT_DB, rc);
+    EXPECT_EQ(nullptr, records);
+    remove(pathname);
+}
+
+// Reading any truncation of a valid database must not crash, and must
+// never return records together with a failure
+static void read_every_truncation(const char *source)
+{
+    std::vector<char> data = read_file(source);
+    ASSERT_FALSE(data.empty());
+    char pathname[L_tmpnam + 1];
+    (void)!tmpnam(pathname);
+    for (size_t len = 0; len < data.size(); ++len)
+    {
+        write_file(pathname, data.data(), len);
+        int rc = -1;
+        PwsDbRecord *records = nullptr;
+        bool status = pws_db_read(pathname, "password", &records, &rc);
+        if (status)
+        {
+            EXPECT_EQ(PRC_SUCCESS, rc) << "len=" << len;
+            pws_free_db_records(records);
+        }
+        else
+        {
+            EXPECT_NE(PRC_SUCCESS, rc) << "len=" << len;
+            EXPECT_EQ(nullptr, records) << "len=" << len;
+        }
+    }
+    remove(pathname);
+}
+
+TEST(Test, ReadEveryTruncationOfDbV1DoesNotCrash)
+{
+    read_every_truncation("data/test-v1.dat");
+}
+
+TEST(Test, ReadEveryTruncationOfDbV2DoesNotCrash)
+{
+    read_every_truncation("data/test-v2.dat");
+}
+
+TEST(Test, WriteRecordWithNullTitleValueFails)
+{
+    int rc = -1;
+    char pathname[L_tmpnam + 1];
+    (void)!tmpnam(pathname);
+    PwsDbField title_rec = {NULL, FT_TITLE, NULL};
+    PwsDbRecord rec = {NULL, &title_rec};
+
+    EXPECT_FALSE(pws_db_write(pathname, "password", &rec, &rc));
+    EXPECT_EQ(PRC_ERR_INVALID_ARG, rc);
+    remove(pathname);
+}
+
+TEST(Test, WriteRecordWithNullFieldValueIgnoresField)
+{
+    int rc = -1;
+    char pathname[L_tmpnam + 1];
+    (void)!tmpnam(pathname);
+    char title[] = "title";
+    PwsDbField title_rec = {NULL, FT_TITLE, title}, notes_rec = {&title_rec, FT_NOTES, NULL};
+    PwsDbRecord rec = {NULL, &notes_rec};
+
+    ASSERT_TRUE(pws_db_write(pathname, "password", &rec, &rc));
+    EXPECT_EQ(PRC_SUCCESS, rc);
+
+    PwsDbRecord *records = nullptr;
+    ASSERT_TRUE(pws_db_read(pathname, "password", &records, &rc));
+    ASSERT_NE(nullptr, records);
+    EXPECT_STREQ(title, pws_rec_get_field(records, FT_TITLE));
+    EXPECT_EQ(nullptr, pws_rec_get_field(records, FT_NOTES));
+    pws_free_db_records(records);
+    remove(pathname);
+}
+
+TEST(Test, WriteRecordWithInvalidSecondUuidFails)
+{
+    int rc = -1;
+    char pathname[L_tmpnam + 1];
+    (void)!tmpnam(pathname);
+    char title[] = "title", uuid[] = "0123456789ABCDEF0123456789ABCDEF", bad_uuid[] = "abc";
+    PwsDbField title_rec = {NULL, FT_TITLE, title},
+        bad_uuid_rec = {&title_rec, FT_UUID, bad_uuid},
+        uuid_rec = {&bad_uuid_rec, FT_UUID, uuid};
+    PwsDbRecord rec = {NULL, &uuid_rec};
+
+    EXPECT_FALSE(pws_db_write(pathname, "password", &rec, &rc));
+    EXPECT_EQ(PRC_ERR_INVALID_ARG, rc);
+    remove(pathname);
+}
+
+TEST(Test, WriteRecordWithNonAsciiUuidFails)
+{
+    int rc = -1;
+    char pathname[L_tmpnam + 1];
+    (void)!tmpnam(pathname);
+    char title[] = "title", uuid[] = "\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD"
+                                     "\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD\xAD";
+    PwsDbField title_rec = {NULL, FT_TITLE, title}, uuid_rec = {&title_rec, FT_UUID, uuid};
+    PwsDbRecord rec = {NULL, &uuid_rec};
+
+    EXPECT_FALSE(pws_db_write(pathname, "password", &rec, &rc));
+    EXPECT_EQ(PRC_ERR_INVALID_ARG, rc);
+    remove(pathname);
+}
+
+TEST(Test, ReadDbV2TruncatedBeforeEndFieldFails)
+{
+    int rc = -1;
+    char pathname[L_tmpnam + 1];
+    (void)!tmpnam(pathname);
+    char title1[] = "title1", title2[] = "title2";
+    PwsDbField title1_rec = {NULL, FT_TITLE, title1}, title2_rec = {NULL, FT_TITLE, title2};
+    PwsDbRecord rec2 = {NULL, &title2_rec}, rec1 = {&rec2, &title1_rec};
+    ASSERT_TRUE(pws_db_write(pathname, "password", &rec1, &rc));
+
+    // Drop the last record's FT_END field (one length block, one data block)
+    std::vector<char> data = read_file(pathname);
+    ASSERT_GT(data.size(), 16u);
+    write_file(pathname, data.data(), data.size() - 16);
+
+    PwsDbRecord *records = (PwsDbRecord *)0x1;
+    EXPECT_FALSE(pws_db_read(pathname, "password", &records, &rc));
+    EXPECT_EQ(PRC_ERR_CORRUPT_DB, rc);
+    EXPECT_EQ(nullptr, records);
+    remove(pathname);
+}
+
+TEST(Test, FailedWriteLeavesExistingDbUnchanged)
+{
+    int rc = -1;
+    char pathname[L_tmpnam + 1];
+    (void)!tmpnam(pathname);
+    char title[] = "title";
+    PwsDbField title_rec = {NULL, FT_TITLE, title};
+    PwsDbRecord good = {NULL, &title_rec};
+    ASSERT_TRUE(pws_db_write(pathname, "password", &good, &rc));
+    std::vector<char> before = read_file(pathname);
+
+    // Second record has no title, so the write fails after the first record
+    char notes[] = "notes";
+    PwsDbField notes_rec = {NULL, FT_NOTES, notes};
+    PwsDbRecord bad = {NULL, &notes_rec}, first = {&bad, &title_rec};
+    EXPECT_FALSE(pws_db_write(pathname, "password", &first, &rc));
+    EXPECT_EQ(PRC_ERR_INVALID_ARG, rc);
+
+    EXPECT_EQ(before, read_file(pathname));
+    PwsDbRecord *records = nullptr;
+    ASSERT_TRUE(pws_db_read(pathname, "password", &records, &rc));
+    ASSERT_NE(nullptr, records);
+    EXPECT_STREQ(title, pws_rec_get_field(records, FT_TITLE));
+    pws_free_db_records(records);
+    remove(pathname);
+}
+
+TEST(Test, WriteFieldAtMaxLengthRoundTrips)
+{
+    int rc = -1;
+    char pathname[L_tmpnam + 1];
+    (void)!tmpnam(pathname);
+    char title[] = "title";
+    std::string notes(64 * 1024, 'n');
+    PwsDbField title_rec = {NULL, FT_TITLE, title}, notes_rec = {&title_rec, FT_NOTES, notes.data()};
+    PwsDbRecord rec = {NULL, &notes_rec};
+    ASSERT_TRUE(pws_db_write(pathname, "password", &rec, &rc));
+
+    PwsDbRecord *records = nullptr;
+    ASSERT_TRUE(pws_db_read(pathname, "password", &records, &rc));
+    ASSERT_NE(nullptr, records);
+    EXPECT_STREQ(notes.c_str(), pws_rec_get_field(records, FT_NOTES));
+    pws_free_db_records(records);
+    remove(pathname);
+}
+
+TEST(Test, WriteFieldOverMaxLengthFails)
+{
+    int rc = -1;
+    char pathname[L_tmpnam + 1];
+    (void)!tmpnam(pathname);
+    char title[] = "title";
+    std::string notes(64 * 1024 + 1, 'n');
+    PwsDbField title_rec = {NULL, FT_TITLE, title}, notes_rec = {&title_rec, FT_NOTES, notes.data()};
+    PwsDbRecord rec = {NULL, &notes_rec};
+    EXPECT_FALSE(pws_db_write(pathname, "password", &rec, &rc));
+    EXPECT_EQ(PRC_ERR_INVALID_ARG, rc);
+    // A failed write of a new database must not leave a file behind
+    EXPECT_TRUE(read_file(pathname).empty());
+    remove(pathname);
+}
