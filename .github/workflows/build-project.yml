@@ -16,7 +16,7 @@ jobs:
       run: |
         sudo apt-get -y update
         sudo apt-get -y install cmake ninja-build gcc g++ doxygen graphviz libgtest-dev libssl-dev
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v7
     - name: Configure
       run: cmake --preset=x64-linux-gcc-release
     - name: Build
@@ -28,7 +28,7 @@ jobs:
         cd build
         cpack -G TGZ
     - name: Push release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v3
       if: startsWith(github.ref, 'refs/tags/')
       with:
         files: build/*.tar.gz
@@ -42,11 +42,11 @@ jobs:
     env:
       VCPKG_ROOT: C:\vcpkg
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v7
     - name: Enable MSVC dev environment
       uses: ilammy/msvc-dev-cmd@v1
     - name: Cache vcpkg packages
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: ${{ github.workspace }}\build\vcpkg_installed
         key: vcpkg-x64-windows-${{ hashFiles('vcpkg.json', 'vcpkg-configuration.json') }}
@@ -61,7 +61,7 @@ jobs:
         cd build
         cpack -G ZIP
     - name: Push release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v3
       if: startsWith(github.ref, 'refs/tags/')
       with:
         files: build/*.zip
