@@ -1,12 +1,16 @@
 name: CMake workflow for libpwsafe
 
-on: 
+on:
   push:
-    branches: 
-      - main
-      - dev/*
-    tags:
-      - v*
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-linux:
