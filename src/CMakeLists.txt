@@ -6,7 +6,7 @@ list(APPEND SRC
 add_library(objlib OBJECT ${SRC})
 target_include_directories(objlib PUBLIC ${OPENSSL_INCLUDE_DIR})
 
-if (DEFINED CLANG_TIDY_EXE)
+if (CLANG_TIDY_EXE)
     set_target_properties(objlib
         PROPERTIES 
         C_CLANG_TIDY "${CLANG_TIDY_EXE};-checks=-*,readability-*,-readability-identifier-length,-readability-braces-around-statements,-readability-magic-numbers,-readability-math-missing-parentheses,bugprone-*,clang-analyzer-*,cert-*,cppcoreguidelines-init-variables")
